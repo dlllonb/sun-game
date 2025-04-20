@@ -1,2 +1,4 @@
 # sun-game
-repository for A&amp;T project about the Sun 
+repository for A&amp;T project about the Sun.
+
+// first commit. 
