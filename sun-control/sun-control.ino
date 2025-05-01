@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #define BLINK_PIN 13  // GPIO 13
+#define VIBRATION_PIN 12
 #define THERMISTOR_PIN 26
 
 MPU6050 mpu;
@@ -11,8 +12,16 @@ float heat = 0;
 
 String incomingCommand = "";
 
+bool game = false;
+
+const int PWM_CHANNEL = 0;
+int vibrationLevel = 0;
+
+
 void setup() {
   pinMode(BLINK_PIN, OUTPUT);
+  ledcAttachPin(VIBRATION_PIN, PWM_CHANNEL);   
+  ledcSetup(PWM_CHANNEL, 5000, 8);
   Serial.begin(115200);
   Wire.begin(23, 22);
 
@@ -30,12 +39,17 @@ const long blinkInterval = 1000;  // milliseconds
 bool ledState = false;
 
 void loop() {
+  // handle commands and vibrate motor
   readSerialCommand();
-  blinkDebugLED();
+
+  //blinkDebugLED();
+  // read and send sensor data
   readThermistor();
   readMPU();
   sendSensorData();
-  delay(50);
+
+  // small delay 
+  delay(15);
 }
 
 void readSerialCommand() {
@@ -46,9 +60,12 @@ void readSerialCommand() {
     if (c == '\n') {
       incomingCommand.trim();  // remove stray whitespace or \r
 
-      if (incomingCommand == "vibrate") {
-        // vibrate();
-      } 
+      if (incomingCommand.startsWith("vibrate")) {
+        int level = incomingCommand.substring(7).toInt();
+        vibrate(level);
+        Serial.print("vibrate level: ");
+        Serial.println(level);
+      }
       else if (incomingCommand == "flare") {
         // triggerFlare();
       } 
@@ -107,4 +124,9 @@ void sendSensorData() {
   Serial.println(heat);
 }
 
+void vibrate(int level) {
+  vibrationLevel = constrain(level, 0, 5);
+  int pwmDuty = map(vibrationLevel, 0, 5, 0, 255);
+  ledcWrite(PWM_CHANNEL, pwmDuty);  // Set motor speed
+}
 
