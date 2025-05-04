@@ -49,7 +49,7 @@ def read_arduino_sensor_data(arduino):
                     return [float(x) for x in parts]
                 except ValueError:
                     print(f"Malformed float in line: {line}")
-    return None
+    return [float(0) for _ in range(7)]
 
 class SolarFlare:
     def __init__(self, angle):
@@ -221,10 +221,10 @@ class Sun:
                         
                         # Calculate required counter magnitude based on flare strength
                         required_magnitude = flare.push_strength * self.speed
-                        
+
                         # Single key movement should be enough to counter
                         movement_magnitude = self.speed
-                        
+
                         # If player is moving in opposite direction with sufficient force
                         if dot_product < -0.5 and movement_magnitude >= required_magnitude:
                             flare.countered = True
@@ -367,7 +367,6 @@ def main():
     try:
         arduino = serial.Serial(port='COM3', baudrate=115200, timeout=1)
         time.sleep(0.5)
-        #arduino.reset_input_buffer()
         print('Starting Arduino serial connection...')
     except Exception as e:
         print(f"Failed to connect to Arduino: {e}")
