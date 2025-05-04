@@ -12,6 +12,9 @@ WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 FPS = 60
 
+# --- UNLOSEABLE MODE FOR TESTING ---
+UNLOSEABLE = True
+
 # Colors
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 0)
@@ -251,8 +254,9 @@ class Sun:
             earth_flare.warning_time = 0
             earth_flare.active = True
             self.flares.append(earth_flare)
-            self.earth.alive = False
-            return True
+            if not UNLOSEABLE:
+                self.earth.alive = False
+                return True
 
         # Update flare cooldown
         self.current_cooldown -= 1
@@ -270,8 +274,9 @@ class Sun:
             if flare.active:
                 if flare.earth_flare:
                     # Immediately end game when Earth is targeted
-                    self.earth.alive = False
-                    return True
+                    if not UNLOSEABLE:
+                        self.earth.alive = False
+                        return True
                 else:
                     # Move the sun due to flare push
                     push_x = flare.dx * flare.push_strength
@@ -306,8 +311,9 @@ class Sun:
                         earth_flare.warning_time = 0
                         earth_flare.active = True
                         self.flares.append(earth_flare)
-                        self.earth.alive = False
-                        return True
+                        if not UNLOSEABLE:
+                            self.earth.alive = False
+                            return True
                     
                     # Remove flare if countered
                     if flare.countered:
@@ -320,7 +326,7 @@ class Sun:
             self.x += dx
             self.y += dy
         
-        return False
+        return False  # Never game over in UNLOSEABLE mode
     
     def draw(self):
         # Draw the sun with color based on both flare frequency and stability
@@ -393,9 +399,8 @@ def main():
                 pass
 
             # Update sun and earth
-            # make it so that you can't lose the game 
-            # game_over = sun.update()
-            sun.update()
+            # make it so that you can't
+            game_over = sun.update()
             earth.update()
 
         # Drawing
