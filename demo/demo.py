@@ -367,7 +367,7 @@ def main():
     try:
         arduino = serial.Serial(port='COM3', baudrate=115200, timeout=1)
         time.sleep(0.5)
-        arduino.reset_input_buffer()
+        #arduino.reset_input_buffer()
         print('Starting Arduino serial connection...')
     except Exception as e:
         print(f"Failed to connect to Arduino: {e}")

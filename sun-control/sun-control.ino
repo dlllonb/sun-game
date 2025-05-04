@@ -17,6 +17,8 @@ bool game = false;
 const int PWM_CHANNEL = 0;
 int vibrationLevel = 0;
 
+bool flaring = false;
+
 
 void setup() {
   pinMode(BLINK_PIN, OUTPUT);
@@ -48,15 +50,22 @@ void loop() {
   readMPU();
   sendSensorData();
 
+  if (!flaring){
+    vibration_feedback();
+  } else {
+    flare();
+    flaring = false;
+  }
+
   // small delay 
-  delay(15);
+  //delay(15);
 }
 
 void readSerialCommand() {
   while (Serial.available() > 0) {
     char c = Serial.read();
 
-    // End of command line
+    // End of command linegit 
     if (c == '\n') {
       incomingCommand.trim();  // remove stray whitespace or \r
 
@@ -67,7 +76,7 @@ void readSerialCommand() {
         Serial.println(level);
       }
       else if (incomingCommand == "flare") {
-        // triggerFlare();
+        flaring = true;
       } 
       else if (incomingCommand == "reset") {
         // resetSun();
@@ -129,4 +138,46 @@ void vibrate(int level) {
   int pwmDuty = map(vibrationLevel, 0, 5, 0, 255);
   ledcWrite(PWM_CHANNEL, pwmDuty);  // Set motor speed
 }
+
+void vibration_feedback() {
+  // Baseline accelerometer readings when still (tune these for your setup)
+  const int16_t ax_base = 1000;
+  const int16_t ay_base = -1000;
+  const int16_t az_base = 18200;
+
+  // Calculate delta from resting state
+  int16_t dax = ax - ax_base;
+  int16_t day = ay - ay_base;
+  int16_t daz = az - az_base;
+
+  // Calculate magnitude of acceleration change
+  float motion_mag = sqrt(dax * dax + day * day + daz * daz);
+
+  // Map to 0–50 PWM range, clamp as needed
+  int pwm_value = motion_mag / 180.0;  // adjust divisor to tune sensitivity
+  if (pwm_value > 60) pwm_value = 60;
+
+  ledcWrite(PWM_CHANNEL, pwm_value);
+  Serial.println(pwm_value); Serial.print(" ");
+}
+
+void flare() {
+  const int duration_ms = 1000;      // total duration of flare
+  const int steps = 50;              // number of PWM updates
+  const float pi = 3.14159;
+
+  for (int i = 0; i <= steps; i++) {
+    // Create a flare-like curve: sin(pi * x) goes 0→1→0 smoothly
+    float progress = (float)i / steps;
+    float intensity = sin(progress * pi);  // sinusoidal envelope
+    int pwm_value = intensity * 255;
+
+    ledcWrite(0, pwm_value);
+    delay(duration_ms / steps);
+  }
+
+  // Ensure motor ends at 0
+  ledcWrite(0, 0);
+}
+
 
