@@ -395,6 +395,7 @@ def main():
                 sensor_data = read_arduino_sensor_data()
                 if sensor_data:
                     ax, ay, *_ = sensor_data
+                    print(f"Sensor movement ax: {ax}, ay: {ay}")
                     scale = 0.001  # Adjust as needed for sensitivity
                     dx = ax * scale
                     dy = ay * scale
