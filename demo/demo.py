@@ -1,6 +1,8 @@
 import pygame
 import math
 import random
+import serial
+import time
 
 # Initialize Pygame
 pygame.init()
@@ -26,6 +28,30 @@ MAX_PUSH_STRENGTH = 0.8
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Solar System Simulation")
 clock = pygame.time.Clock()
+
+# --- Arduino Serial Setup ---
+try:
+    arduino = serial.Serial(port='COM3', baudrate=115200, timeout=1)
+    time.sleep(0.5)
+    print('Starting Arduino serial connection...')
+except Exception as e:
+    print(f"Failed to connect to Arduino: {e}")
+    arduino = None
+
+latest_data = None
+
+def read_arduino_sensor_data():
+    global latest_data
+    if arduino and arduino.in_waiting > 0:
+        line = arduino.readline().decode('utf-8', errors='ignore').strip()
+        if line:
+            parts = line.split()
+            if len(parts) == 7:
+                try:
+                    latest_data = [float(x) for x in parts]
+                except ValueError:
+                    print(f"Malformed float in line: {line}")
+    return latest_data
 
 class SolarFlare:
     def __init__(self, angle):
@@ -347,12 +373,24 @@ def main():
                     earth = Earth(sun)
                     sun.earth = earth
                     game_over = False
+                # Optionally, keep TAB for keyboard fallback (not implemented here)
+                # elif event.key == pygame.K_TAB:
+                #     use_arduino_control = not use_arduino_control
+                #     print(f"Arduino control: {use_arduino_control}")
 
         if not game_over:
-            keys = pygame.key.get_pressed()
-            dx = (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) * sun.speed
-            dy = (keys[pygame.K_DOWN] - keys[pygame.K_UP]) * sun.speed
-            sun.move(dx, dy)
+            # Use Arduino sensor data for sun movement
+            sensor_data = read_arduino_sensor_data()
+            if sensor_data:
+                ax, ay, *_ = sensor_data
+                # Normalize and scale ax, ay to get dx, dy
+                scale = 0.001  # Adjust as needed for sensitivity
+                dx = ax * scale
+                dy = ay * scale
+                sun.move(dx, dy)
+            else:
+                # If no Arduino data, don't move the sun
+                pass
 
             # Update sun and earth
             game_over = sun.update()
