@@ -45,10 +45,10 @@ except Exception as e:
 
 latest_data = None
 
-def send_command(command):
-    global arduino
-    if arduino and arduino.is_open:
-        arduino.write((command.strip() + '\n').encode('utf-8'))
+# def send_command(command):
+#     global arduino
+#     if arduino and arduino.is_open:
+#         arduino.write((command.strip() + '\n').encode('utf-8'))
 
 def read_arduino_sensor_data():
     global latest_data
@@ -269,7 +269,7 @@ class Sun:
                 angle = random.uniform(0, 2 * math.pi)
                 new_flare = SolarFlare(angle)
                 self.flares.append(new_flare)
-                send_command("flare")
+                # send_command("flare")
             self.current_cooldown = self.flare_cooldown
         
         # Apply flare effects separately from player movement
