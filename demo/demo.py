@@ -34,34 +34,22 @@ screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Solar System Simulation")
 clock = pygame.time.Clock()
 
-# --- Arduino Serial Setup ---
-try:
-    arduino = serial.Serial(port='COM3', baudrate=115200, timeout=1)
-    time.sleep(0.5)
-    print('Starting Arduino serial connection...')
-except Exception as e:
-    print(f"Failed to connect to Arduino: {e}")
-    arduino = None
-
-latest_data = None
-
 # def send_command(command):
 #     global arduino
 #     if arduino and arduino.is_open:
 #         arduino.write((command.strip() + '\n').encode('utf-8'))
 
-def read_arduino_sensor_data():
-    global latest_data
+def read_arduino_sensor_data(arduino):
     if arduino and arduino.in_waiting > 0:
         line = arduino.readline().decode('utf-8', errors='ignore').strip()
         if line:
             parts = line.split()
             if len(parts) == 7:
                 try:
-                    latest_data = [float(x) for x in parts]
+                    return [float(x) for x in parts]
                 except ValueError:
                     print(f"Malformed float in line: {line}")
-    return latest_data
+    return None
 
 class SolarFlare:
     def __init__(self, angle):
@@ -376,6 +364,15 @@ def main():
 
     use_arduino_control = True  # Control flag for Arduino vs keyboard
 
+    try:
+        arduino = serial.Serial(port='COM3', baudrate=115200, timeout=1)
+        time.sleep(0.5)
+        arduino.reset_input_buffer()
+        print('Starting Arduino serial connection...')
+    except Exception as e:
+        print(f"Failed to connect to Arduino: {e}")
+        arduino = None
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -392,7 +389,7 @@ def main():
 
         if not game_over:
             if use_arduino_control:
-                sensor_data = read_arduino_sensor_data()
+                sensor_data = read_arduino_sensor_data(arduino)
                 if sensor_data:
                     ax, ay, *_ = sensor_data
                     print(f"Sensor movement ax: {ax}, ay: {ay}")
