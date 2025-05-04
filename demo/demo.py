@@ -393,7 +393,9 @@ def main():
                 pass
 
             # Update sun and earth
-            game_over = sun.update()
+            # make it so that you can't lose the game 
+            # game_over = sun.update()
+            sun.update()
             earth.update()
 
         # Drawing
