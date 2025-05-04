@@ -3,6 +3,11 @@ import math
 import random
 import serial
 import time
+import sys
+
+
+# --- TEST MODE ---
+TEST_MODE = '--test' in sys.argv
 
 # Initialize Pygame
 pygame.init()
@@ -11,9 +16,6 @@ pygame.init()
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 FPS = 60
-
-# --- UNLOSEABLE MODE FOR TESTING ---
-UNLOSEABLE = True
 
 # Colors
 BLACK = (0, 0, 0)
@@ -42,6 +44,11 @@ except Exception as e:
     arduino = None
 
 latest_data = None
+
+def send_command(command):
+    global arduino
+    if arduino and arduino.is_open:
+        arduino.write((command.strip() + '\n').encode('utf-8'))
 
 def read_arduino_sensor_data():
     global latest_data
@@ -109,7 +116,7 @@ class Sun:
         self.speed = 1.1
         self.color = (255, 255, 0)  # Start as pure yellow
         self.flares = []
-        self.base_flare_cooldown = 80  # Base cooldown between flares
+        self.base_flare_cooldown = 100  # Base cooldown between flares
         self.flare_cooldown = self.base_flare_cooldown
         self.current_cooldown = self.flare_cooldown
         self.initial_x = x
@@ -124,12 +131,12 @@ class Sun:
         self.movement_threshold = 8  # Threshold for increasing flare frequency
         # Stability tracking for game over condition
         self.stability_window = []
-        self.max_stability_window = 30  # Longer window for stability
-        self.stability_threshold = 15  # Higher threshold for game over
+        self.max_stability_window = 50  # Longer window for stability
+        self.stability_threshold = 30  # Higher threshold for game over
         self.current_stability = 0
         # Grace period tracking
         self.grace_period = 0
-        self.grace_duration = 15
+        self.grace_duration = 25
     
     def move(self, dx, dy):
         # Only process player movement if there's input
@@ -233,10 +240,6 @@ class Sun:
                         if dot_product < -0.5 and movement_magnitude >= required_magnitude:
                             flare.countered = True
                             self.grace_period = self.grace_duration  # Start grace period when flare is countered
-                        elif dot_product < -0.5:
-                            print("Need more force to counter!")
-                        else:
-                            print("Wrong direction!")
     
     def update(self):
         # Update grace period
@@ -244,8 +247,8 @@ class Sun:
             self.grace_period -= 1
 
         # Check for excessive instability
-        if self.current_stability > self.stability_threshold:
-            print(f"Sun too unstable! Stability: {self.current_stability}")
+        if self.current_stability > self.stability_threshold and not TEST_MODE:
+            # print(f"Sun too unstable! Stability: {self.current_stability}")
             # Create instability flare targeting Earth
             earth_flare = SolarFlare(0)
             earth_flare.earth_flare = True
@@ -254,7 +257,7 @@ class Sun:
             earth_flare.warning_time = 0
             earth_flare.active = True
             self.flares.append(earth_flare)
-            if not UNLOSEABLE:
+            if not TEST_MODE:
                 self.earth.alive = False
                 return True
 
@@ -265,6 +268,7 @@ class Sun:
                 angle = random.uniform(0, 2 * math.pi)
                 new_flare = SolarFlare(angle)
                 self.flares.append(new_flare)
+                send_command("flare")
             self.current_cooldown = self.flare_cooldown
         
         # Apply flare effects separately from player movement
@@ -274,7 +278,7 @@ class Sun:
             if flare.active:
                 if flare.earth_flare:
                     # Immediately end game when Earth is targeted
-                    if not UNLOSEABLE:
+                    if not TEST_MODE:
                         self.earth.alive = False
                         return True
                 else:
@@ -303,7 +307,7 @@ class Sun:
                     self.y = max(self.radius, min(WINDOW_HEIGHT - self.radius, new_y))
                     
                     # Check if flare should target Earth
-                    if not flare.warning and not flare.countered:
+                    if not flare.warning and not flare.countered and not TEST_MODE:
                         earth_flare = SolarFlare(0)
                         earth_flare.earth_flare = True
                         earth_flare.earth_target = self.earth
@@ -311,7 +315,7 @@ class Sun:
                         earth_flare.warning_time = 0
                         earth_flare.active = True
                         self.flares.append(earth_flare)
-                        if not UNLOSEABLE:
+                        if not TEST_MODE:
                             self.earth.alive = False
                             return True
                     
@@ -326,7 +330,7 @@ class Sun:
             self.x += dx
             self.y += dy
         
-        return False  # Never game over in UNLOSEABLE mode
+        return False
     
     def draw(self):
         # Draw the sun with color based on both flare frequency and stability
@@ -369,6 +373,8 @@ def main():
     running = True
     game_over = False
 
+    use_arduino_control = True  # Control flag for Arduino vs keyboard
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -379,27 +385,29 @@ def main():
                     earth = Earth(sun)
                     sun.earth = earth
                     game_over = False
-                # Optionally, keep TAB for keyboard fallback (not implemented here)
-                # elif event.key == pygame.K_TAB:
-                #     use_arduino_control = not use_arduino_control
-                #     print(f"Arduino control: {use_arduino_control}")
+                elif event.key == pygame.K_TAB:
+                    use_arduino_control = not use_arduino_control
+                    print(f"Arduino control: {use_arduino_control}")
 
         if not game_over:
-            # Use Arduino sensor data for sun movement
-            sensor_data = read_arduino_sensor_data()
-            if sensor_data:
-                ax, ay, *_ = sensor_data
-                # Normalize and scale ax, ay to get dx, dy
-                scale = 0.001  # Adjust as needed for sensitivity
-                dx = ax * scale
-                dy = ay * scale
-                sun.move(dx, dy)
+            if use_arduino_control:
+                sensor_data = read_arduino_sensor_data()
+                if sensor_data:
+                    ax, ay, *_ = sensor_data
+                    scale = 0.001  # Adjust as needed for sensitivity
+                    dx = ax * scale
+                    dy = ay * scale
+                    sun.move(dx, dy)
+                else:
+                    # If no Arduino data, don't move the sun
+                    pass
             else:
-                # If no Arduino data, don't move the sun
-                pass
+                keys = pygame.key.get_pressed()
+                dx = (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) * sun.speed
+                dy = (keys[pygame.K_DOWN] - keys[pygame.K_UP]) * sun.speed
+                sun.move(dx, dy)
 
             # Update sun and earth
-            # make it so that you can't
             game_over = sun.update()
             earth.update()
 
