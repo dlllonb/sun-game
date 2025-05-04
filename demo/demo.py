@@ -142,9 +142,10 @@ class Sun:
         # Only process player movement if there's input
         if dx != 0 or dy != 0:
             # Normalize diagonal movement to match single-key movement strength
-            if dx != 0 and dy != 0:
-                dx *= 0.707  # 1/sqrt(2)
-                dy *= 0.707  # This makes diagonal movement same strength as cardinal
+            print(f"Moving sun dx: {dx}, dy: {dy}")
+            # if dx != 0 and dy != 0 and key:
+            #     dx *= 0.707  # 1/sqrt(2)
+            #     dy *= 0.707  # This makes diagonal movement same strength as cardinal
 
             # Calculate new position from player input
             new_x = self.x + dx
