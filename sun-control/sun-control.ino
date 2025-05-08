@@ -57,8 +57,8 @@ void loop() {
     flaring = false;
   }
 
-  // small delay 
-  //delay(15);
+  // small delay to match FPS of game
+  delay(16);
 }
 
 void readSerialCommand() {
@@ -141,8 +141,8 @@ void vibrate(int level) {
 
 void vibration_feedback() {
   // Baseline accelerometer readings when still (tune these for your setup)
-  const int16_t ax_base = 1000;
-  const int16_t ay_base = -1000;
+  const int16_t ax_base = 1100;
+  const int16_t ay_base = -500;
   const int16_t az_base = 18200;
 
   // Calculate delta from resting state
