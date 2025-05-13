@@ -48,9 +48,9 @@ frame_index = 0
 rotation_speed = 0.1 # no lower than .2
 rotation_speed_history = deque([rotation_speed])
 
-def read_arduino_sensor_data(arduino, num_parts):
-    if arduino and arduino.in_waiting > 0:
-        line = arduino.readline().decode('utf-8', errors='ignore').strip()
+def read_arduino_sensor_data(bt, num_parts):
+    if bt and bt.in_waiting > 0:
+        line = bt.readline().decode('utf-8', errors='ignore').strip()
         if line:
             parts = line.split()
             if len(parts) == num_parts:
@@ -66,10 +66,10 @@ while running:
             running = False
 
     sensor_data = read_arduino_sensor_data(bt, 1)
-    sensor_rotation = sensor_data[0]
+    sensor_rotation = sensor_data[0] / 2000
 
-    if -0.2 < sensor_rotation < 0.2:
-        sensor_rotation = 0.2 if sensor_rotation > 0 else -0.2
+    # if -0.2 < sensor_rotation < 0.2:
+    #     sensor_rotation = 0.2 if sensor_rotation > 0 else -0.2
 
     rotation_speed_history.append(sensor_rotation)
 
@@ -98,7 +98,7 @@ while running:
     sun_frames[frame_next].set_alpha(255)
 
     screen.blit(frame_surface, (0, 0))
-    print(f"Showing frame {int(frame_index) % len(sun_frames)}")
+    #print(f"Showing frame {int(frame_index) % len(sun_frames)}")
 
     pygame.display.flip()
     frame_index += rotation_speed

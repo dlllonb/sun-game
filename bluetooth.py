@@ -22,4 +22,4 @@ while True:
     # command = input("Send command: ")
     # bt.write((command.strip() + "\n").encode())
 
-    time.sleep(0.05)  # ~20Hz loop
+    #time.sleep(0.05)  # ~20Hz loop
