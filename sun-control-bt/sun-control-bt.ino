@@ -22,6 +22,12 @@ int vibrationLevel = 0;
 
 bool flaring = false;
 
+void readMPU() {
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+}
+int16_t x_offset;
+int16_t y_offset;
+int16_t z_offset;
 
 void setup() {
   pinMode(BLINK_PIN, OUTPUT);
@@ -38,6 +44,25 @@ void setup() {
     while (1);  // Stop program
   }
   Serial.println("MPU6050 connected successfully!");
+  Serial.println("Calibrating gyroscope offsets...");
+  int32_t sum_gx = 0, sum_gy = 0, sum_gz = 0;
+
+  const int calibration_samples = 50;
+
+  for (int i = 0; i < calibration_samples; i++) {
+    readMPU();  // gets ax, ay, az, gx, gy, gz
+    sum_gx += gx;
+    sum_gy += gy;
+    sum_gz += gz;
+    delay(5);
+  }
+
+  int16_t x_offset = sum_gx / calibration_samples;
+  int16_t y_offset = sum_gy / calibration_samples;
+  int16_t z_offset = sum_gz / calibration_samples;
+  Serial.print("x_offset: "); Serial.println(x_offset);
+  Serial.print("y_offset: "); Serial.println(y_offset);
+  Serial.print("z_offset: "); Serial.println(z_offset);
 }
 
 unsigned long previousMillis = 0;
@@ -161,10 +186,6 @@ void readThermistor() {
   if (heat > 100) heat = 100;
 }
 
-void readMPU() {
-  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-}
-
 void sendSensorData() {
   //Serial.print(ax); Serial.print(" ");
   //Serial.print(ay); Serial.print(" ");
@@ -176,9 +197,6 @@ void sendSensorData() {
 }
 
 void sendSensorDataBT() {
-  int z_offset = -180;
-  int x_offset = -240;
-  int y_offset = -65;
   // SerialBT.print(ax); SerialBT.print(" ");
   // SerialBT.print(ay); SerialBT.print(" ");
   // SerialBT.print(az); SerialBT.print(" ");
