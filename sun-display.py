@@ -73,7 +73,6 @@ while running:
     sensor_drift_x = sensor_data[0] / 2000
     sensor_drift_y = sensor_data[1] / 2000
 
-
     # if -0.2 < sensor_rotation < 0.2:
     #     sensor_rotation = 0.2 if sensor_rotation > 0 else -0.2
 
@@ -86,8 +85,8 @@ while running:
     # LIVE TILT SHIFTING
     dx = sensor_drift_x
     dy = sensor_drift_y
-    x_drift += dx
-    y_drift += dy
+    x_drift += dx - (x_drift / 100)
+    y_drift += dy - (y_drift / 100)
 
     # Clear screen
     screen.fill((0, 0, 0))
