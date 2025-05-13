@@ -51,6 +51,14 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
+    bt_command = ''
+    if bt.in_waiting > 0:
+        line = bt.readline().decode('utf-8', errors='ignore').strip()
+        if line:
+            print("From ESP32:", line)
+    
+        
+
     # Clear screen
     screen.fill((0, 0, 0))
 
