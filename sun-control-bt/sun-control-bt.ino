@@ -53,6 +53,7 @@ void loop() {
   // read and send sensor data
   readThermistor();
   readMPU();
+  sendSensorData();
   sendSensorDataBT();
 
   if (!flaring){
@@ -165,23 +166,27 @@ void readMPU() {
 }
 
 void sendSensorData() {
-  Serial.print(ax); Serial.print(" ");
-  Serial.print(ay); Serial.print(" ");
-  Serial.print(az); Serial.print(" ");
-  Serial.print(gx); Serial.print(" ");
-  Serial.print(gy); Serial.print(" ");
-  Serial.print(gz); Serial.print(" ");
-  Serial.println(heat);
+  //Serial.print(ax); Serial.print(" ");
+  //Serial.print(ay); Serial.print(" ");
+  //Serial.print(az); Serial.print(" ");
+  //Serial.print(gx); Serial.print(" ");  // tilt
+  //Serial.print(gy); Serial.print(" ");
+  Serial.print(gz); Serial.println(" ");  // spin
+  //Serial.println(heat);
 }
 
 void sendSensorDataBT() {
-  SerialBT.print(ax); SerialBT.print(" ");
-  SerialBT.print(ay); SerialBT.print(" ");
-  SerialBT.print(az); SerialBT.print(" ");
-  SerialBT.print(gx); SerialBT.print(" ");
-  SerialBT.print(gy); SerialBT.print(" ");
-  SerialBT.print(gz); SerialBT.print(" ");
-  SerialBT.println(heat);
+  int z_offset = -180;
+  // SerialBT.print(ax); SerialBT.print(" ");
+  // SerialBT.print(ay); SerialBT.print(" ");
+  // SerialBT.print(az); SerialBT.print(" ");
+  // SerialBT.print(gx); SerialBT.print(" ");
+  // SerialBT.print(gy); SerialBT.print(" ");
+     SerialBT.print(gz - z_offset); SerialBT.println(" ");
+  // SerialBT.println(heat);
+
+  // convert gz to a spin rate, send it to sun-display
+  //SerialBT.println(gz);
 }
 
 void vibrate(int level) {

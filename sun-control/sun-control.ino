@@ -124,13 +124,13 @@ void readMPU() {
 }
 
 void sendSensorData() {
-  Serial.print(ax); Serial.print(" ");
-  Serial.print(ay); Serial.print(" ");
-  Serial.print(az); Serial.print(" ");
-  Serial.print(gx); Serial.print(" ");
-  Serial.print(gy); Serial.print(" ");
-  Serial.print(gz); Serial.print(" ");
-  Serial.println(heat);
+  //Serial.print(ax); Serial.print(" ");
+  //Serial.print(ay); Serial.print(" ");
+  //Serial.print(az); Serial.print(" ");
+  Serial.print(gx); Serial.print(" ");   // tilt left/right
+  Serial.print(gy); Serial.print(" ");   // forward/backwards
+  Serial.print(gz); Serial.println(" "); // spin/rotation
+  //Serial.println(heat);
 }
 
 void vibrate(int level) {
@@ -158,7 +158,7 @@ void vibration_feedback() {
   if (pwm_value > 60) pwm_value = 60;
 
   ledcWrite(PWM_CHANNEL, pwm_value);
-  Serial.println(pwm_value); Serial.print(" ");
+  //Serial.println(pwm_value); Serial.print(" ");
 }
 
 void flare() {
