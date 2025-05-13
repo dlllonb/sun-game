@@ -16,7 +16,8 @@ except:
     print("Skipping Serial connection.")
 
 pygame.init()
-screen = pygame.display.set_mode((800, 800))
+SCREEN_SIZE = 1000
+screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
 pygame.display.set_caption("Sun Simulation")
 clock = pygame.time.Clock()
 print("Set up PyGame.")
@@ -43,7 +44,7 @@ FPS = 60
 
 running = True
 frame_index = 0
-rotation_speed = 0.25
+rotation_speed = 0.2 # no lower than .2
 
 while running:
     for event in pygame.event.get():
@@ -53,17 +54,28 @@ while running:
     # Clear screen
     screen.fill((0, 0, 0))
 
-    # Show current frame
-    frame = sun_frames[int(frame_index) % len(sun_frames)]
+    frame_base = int(frame_index) % len(sun_frames)
+    frame_next = (frame_base + 1) % len(sun_frames)
+    blend_ratio = frame_index - frame_base  # value between 0 and 1
+
+    frame_surface = pygame.Surface((SCREEN_SIZE, SCREEN_SIZE), pygame.SRCALPHA)
+
+    x_offset = (SCREEN_SIZE - 512) // 2  # → 144
+    y_offset = (SCREEN_SIZE - 512) // 2  # → 144
+    alpha_next = int(blend_ratio * 255)
+    alpha_base = 255 - alpha_next 
+    sun_frames[frame_base].set_alpha(alpha_base)
+    sun_frames[frame_next].set_alpha(alpha_next)
+    frame_surface.blit(sun_frames[frame_base], (x_offset, y_offset))
+    frame_surface.blit(sun_frames[frame_next], (x_offset, y_offset))
+    sun_frames[frame_base].set_alpha(255)
+    sun_frames[frame_next].set_alpha(255)
+
+    screen.blit(frame_surface, (0, 0))
     print(f"Showing frame {int(frame_index) % len(sun_frames)}")
-    rect = frame.get_rect(center=(400, 400))
-    screen.blit(frame, rect)
 
     pygame.display.flip()
-
-    # Advance frame index
     frame_index += rotation_speed
-
     clock.tick(FPS)
 
 pygame.quit()
