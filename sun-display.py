@@ -48,6 +48,9 @@ frame_index = 0
 rotation_speed = 0.1 # no lower than .2
 rotation_speed_history = deque([rotation_speed])
 
+x_drift = 0
+y_drift = 0
+
 def read_arduino_sensor_data(bt, num_parts):
     if bt and bt.in_waiting > 0:
         line = bt.readline().decode('utf-8', errors='ignore').strip()
@@ -65,18 +68,26 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    sensor_data = read_arduino_sensor_data(bt, 1)
-    sensor_rotation = sensor_data[0] / 2000
+    sensor_data = read_arduino_sensor_data(bt, 3)
+    sensor_rotation = sensor_data[2] / 2000
+    sensor_drift_x = sensor_data[0] / 2000
+    sensor_drift_y = sensor_data[1] / 2000
+
 
     # if -0.2 < sensor_rotation < 0.2:
     #     sensor_rotation = 0.2 if sensor_rotation > 0 else -0.2
 
+    # LIVE ROTATION CHANGING
     rotation_speed_history.append(sensor_rotation)
-
     if len(rotation_speed_history) > 10:
         rotation_speed_history.popleft()
-
     rotation_speed = sum(rotation_speed_history) / len(rotation_speed_history)
+
+    # LIVE TILT SHIFTING
+    dx = sensor_drift_x
+    dy = sensor_drift_y
+    x_drift += dx
+    y_drift += dy
 
     # Clear screen
     screen.fill((0, 0, 0))
@@ -86,8 +97,8 @@ while running:
 
     frame_surface = pygame.Surface((SCREEN_SIZE, SCREEN_SIZE), pygame.SRCALPHA)
 
-    x_offset = (SCREEN_SIZE - 512) // 2  # → 144
-    y_offset = (SCREEN_SIZE - 512) // 2  # → 144
+    x_offset = ((SCREEN_SIZE - 512) // 2) + x_drift
+    y_offset = ((SCREEN_SIZE - 512) // 2) + y_drift
     alpha_next = int(blend_ratio * 255)
     alpha_base = 255 - alpha_next 
     sun_frames[frame_base].set_alpha(alpha_base)
