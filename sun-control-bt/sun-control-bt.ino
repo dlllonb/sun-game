@@ -170,18 +170,20 @@ void sendSensorData() {
   //Serial.print(ay); Serial.print(" ");
   //Serial.print(az); Serial.print(" ");
   //Serial.print(gx); Serial.print(" ");  // tilt
-  //Serial.print(gy); Serial.print(" ");
-  Serial.print(gz); Serial.println(" ");  // spin
+    Serial.print(gy); Serial.println(" ");
+  //Serial.print(gz); Serial.print(" ");  // spin
   //Serial.println(heat);
 }
 
 void sendSensorDataBT() {
   int z_offset = -180;
+  int x_offset = -240;
+  int y_offset = -65;
   // SerialBT.print(ax); SerialBT.print(" ");
   // SerialBT.print(ay); SerialBT.print(" ");
   // SerialBT.print(az); SerialBT.print(" ");
-  // SerialBT.print(gx); SerialBT.print(" ");
-  // SerialBT.print(gy); SerialBT.print(" ");
+     SerialBT.print(gx - x_offset); SerialBT.print(" ");
+     SerialBT.print(gy - y_offset ); SerialBT.print(" ");
      SerialBT.print(gz - z_offset); SerialBT.println(" ");
   // SerialBT.println(heat);
 
