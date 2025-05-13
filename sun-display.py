@@ -5,6 +5,7 @@ import time
 import pygame
 import os
 import traceback
+from collections import deque
 
 # may not be COM6 depending on your system, must pair to device first
 port = 'COM6'
@@ -44,24 +45,41 @@ FPS = 60
 
 running = True
 frame_index = 0
-rotation_speed = 0.2 # no lower than .2
+rotation_speed = 0.1 # no lower than .2
+rotation_speed_history = deque([rotation_speed])
+
+def read_arduino_sensor_data(arduino, num_parts):
+    if arduino and arduino.in_waiting > 0:
+        line = arduino.readline().decode('utf-8', errors='ignore').strip()
+        if line:
+            parts = line.split()
+            if len(parts) == num_parts:
+                try:
+                    return [float(x) for x in parts]
+                except ValueError:
+                    print(f"Malformed float in line: {line}")
+    return [float(0) for _ in range(num_parts)]
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    bt_command = ''
-    if bt.in_waiting > 0:
-        line = bt.readline().decode('utf-8', errors='ignore').strip()
-        if line:
-            print("From ESP32:", line)
-    
-        
+    sensor_data = read_arduino_sensor_data(bt, 1)
+    sensor_rotation = sensor_data[0]
+
+    if -0.2 < sensor_rotation < 0.2:
+        sensor_rotation = 0.2 if sensor_rotation > 0 else -0.2
+
+    rotation_speed_history.append(sensor_rotation)
+
+    if len(rotation_speed_history) > 10:
+        rotation_speed_history.popleft()
+
+    rotation_speed = sum(rotation_speed_history) / len(rotation_speed_history)
 
     # Clear screen
     screen.fill((0, 0, 0))
-
     frame_base = int(frame_index) % len(sun_frames)
     frame_next = (frame_base + 1) % len(sun_frames)
     blend_ratio = frame_index - frame_base  # value between 0 and 1
