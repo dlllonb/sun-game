@@ -28,6 +28,9 @@ void readMPU() {
 int16_t x_offset;
 int16_t y_offset;
 int16_t z_offset;
+// int16_t ax_base;
+// int16_t ay_base;
+// int16_t az_base;
 
 void setup() {
   pinMode(BLINK_PIN, OUTPUT);
@@ -46,23 +49,30 @@ void setup() {
   Serial.println("MPU6050 connected successfully!");
   Serial.println("Calibrating gyroscope offsets...");
   int32_t sum_gx = 0, sum_gy = 0, sum_gz = 0;
+  // int32_t sum_ax = 0, sum_ay = 0, sum_az = 0;
 
-  const int calibration_samples = 50;
+  const int calibration_samples = 100;
 
   for (int i = 0; i < calibration_samples; i++) {
     readMPU();  // gets ax, ay, az, gx, gy, gz
     sum_gx += gx;
     sum_gy += gy;
     sum_gz += gz;
+    // sum_ax += ax;
+    // sum_ay += ay;
+    // sum_az += az;
     delay(5);
   }
 
   int16_t x_offset = sum_gx / calibration_samples;
   int16_t y_offset = sum_gy / calibration_samples;
   int16_t z_offset = sum_gz / calibration_samples;
-  Serial.print("x_offset: "); Serial.println(x_offset);
-  Serial.print("y_offset: "); Serial.println(y_offset);
-  Serial.print("z_offset: "); Serial.println(z_offset);
+  // int16_t ax_base = sum_gx / calibration_samples;
+  // int16_t ay_base = sum_gy / calibration_samples;
+  // int16_t az_base = sum_gz / calibration_samples;
+  // Serial.print("x_offset: "); Serial.println(x_offset);
+  // Serial.print("y_offset: "); Serial.println(y_offset);
+  // Serial.print("z_offset: "); Serial.println(z_offset);
 }
 
 unsigned long previousMillis = 0;
@@ -191,18 +201,21 @@ void sendSensorData() {
   //Serial.print(ay); Serial.print(" ");
   //Serial.print(az); Serial.print(" ");
   //Serial.print(gx); Serial.print(" ");  // tilt
-    Serial.print(gy); Serial.println(" ");
+  //Serial.print(gy); Serial.println(" ");
   //Serial.print(gz); Serial.print(" ");  // spin
   //Serial.println(heat);
 }
 
 void sendSensorDataBT() {
+  int z_offset_ = -180;
+  int x_offset_ = -240;
+  int y_offset_ = -65;
   // SerialBT.print(ax); SerialBT.print(" ");
   // SerialBT.print(ay); SerialBT.print(" ");
   // SerialBT.print(az); SerialBT.print(" ");
-     SerialBT.print(gx - x_offset); SerialBT.print(" ");
-     SerialBT.print(gy - y_offset ); SerialBT.print(" ");
-     SerialBT.print(gz - z_offset); SerialBT.println(" ");
+  SerialBT.print(gx - x_offset_); SerialBT.print(" ");
+  SerialBT.print(gy - y_offset_); SerialBT.print(" ");
+  SerialBT.print(gz - z_offset_); SerialBT.println(" ");
   // SerialBT.println(heat);
 
   // convert gz to a spin rate, send it to sun-display
@@ -216,7 +229,6 @@ void vibrate(int level) {
 }
 
 void vibration_feedback() {
-  // Baseline accelerometer readings when still (tune these for your setup)
   const int16_t ax_base = 1100;
   const int16_t ay_base = -500;
   const int16_t az_base = 18200;
@@ -228,10 +240,12 @@ void vibration_feedback() {
 
   // Calculate magnitude of acceleration change
   float motion_mag = sqrt(dax * dax + day * day + daz * daz);
+  Serial.println(motion_mag); Serial.print(" ");
 
   // Map to 0–50 PWM range, clamp as needed
-  int pwm_value = motion_mag / 180.0;  // adjust divisor to tune sensitivity
-  if (pwm_value > 60) pwm_value = 60;
+  int pwm_value = motion_mag / 160.0;  // adjust divisor to tune sensitivity
+  if (pwm_value > 85) pwm_value = 85;
+  if (pwm_value < 35) pwm_value = 0;
 
   ledcWrite(PWM_CHANNEL, pwm_value);
   Serial.println(pwm_value); Serial.print(" ");
