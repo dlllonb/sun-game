@@ -122,6 +122,27 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        # --- Restart logic ---
+        if event.type == pygame.KEYDOWN and game_over:
+            if event.key == pygame.K_r:
+                # Reset all game state variables
+                frame_index = 0
+                if args.rotation is not None:
+                    rotation_speed = args.rotation
+                    rotation_speed_history = deque([rotation_speed])
+                else:
+                    rotation_speed = 0.1
+                    rotation_speed_history = deque([rotation_speed])
+                x_drift = 0
+                y_drift = 0
+                orbit_distance = 0
+                orbit_tilt_degree = 0
+                earth_angle = 0
+                prev_earth_angle = earth_angle
+                instability_counter = 0
+                game_over = False
+                years = 0.0
+                displayed_year = 0
 
     if not game_over:
         if args.rotation is not None:
@@ -254,6 +275,10 @@ while running:
         font2 = pygame.font.SysFont(None, 40)
         text2 = font2.render("Earth's orbit destabilized!", True, (255, 255, 255))
         screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 40))
+        # --- Restart message ---
+        font3 = pygame.font.SysFont(None, 36)
+        restart_text = font3.render("Press R to Restart", True, (255, 255, 0))
+        screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 100))
 
     font = pygame.font.SysFont(None, 40)
     year_text = font.render(f"{displayed_year}", True, (255, 255, 255))
