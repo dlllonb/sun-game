@@ -89,6 +89,11 @@ instability_counter = 0
 INSTABILITY_LIMIT = 180  # frames (3 seconds at 60 FPS)
 game_over = False
 
+years = 0.0
+displayed_year = 0
+prev_earth_angle = earth_angle
+YEARS_PER_ORBIT = 100
+
 def read_arduino_sensor_data(bt, num_parts):
     if bt and bt.in_waiting > 0:
         line = bt.readline().decode('utf-8', errors='ignore').strip()
@@ -140,6 +145,9 @@ while running:
             x_drift += dx - (x_drift / 100)
             y_drift += dy - (y_drift / 100)
 
+            # Have tilt influence the orbit
+            orbit_tilt_degree = max(-45, min(45, x_drift))
+
         # --- Stability Check ---
         unstable = (
             rotation_speed < ROTATION_MIN or
@@ -147,6 +155,7 @@ while running:
             abs(x_drift) > DRIFT_MAX or
             abs(y_drift) > DRIFT_MAX
         )
+
         if unstable:
             instability_counter += 1
         else:
@@ -156,10 +165,21 @@ while running:
             game_over = True
 
         # --- Earth Orbit ---
-        # Earth orbits faster if unstable
+        prev_earth_angle = earth_angle  # Store previous angle
         earth_angle -= EARTH_ORBIT_SPEED + (0.01 if unstable else 0)
-        if earth_angle > 2 * math.pi:
-            earth_angle -= 2 * math.pi
+        delta_angle = prev_earth_angle - earth_angle
+        if delta_angle < 0:
+            delta_angle += 2 * math.pi
+
+        years += (delta_angle / (2 * math.pi)) * YEARS_PER_ORBIT
+
+        if int(years) > displayed_year:
+            displayed_year = int(years)
+
+        if earth_angle < 0:
+            earth_angle += 2 * math.pi
+
+    
 
     # --- Drawing ---
     screen.fill((0, 0, 0))
@@ -199,6 +219,26 @@ while running:
     frame_surface.blit(base_img, (x_offset, y_offset))
     frame_surface.blit(next_img, (x_offset, y_offset))
 
+    # --- SUN BRIGHTNESS CIRCLE OVERLAY ---
+    # Normalize rotation speed to [0, 1]
+    brightness = (rotation_speed - ROTATION_MIN) / (ROTATION_MAX - ROTATION_MIN)
+    brightness = max(0, min(1, brightness))  # Clamp between 0 and 1
+
+    # Set the maximum brighten value (e.g., 40 for subtle effect)
+    max_brighten = 40
+    brighten = int(brightness * max_brighten)
+
+    if brighten > 0:
+        circle_overlay = pygame.Surface((SUN_SIZE, SUN_SIZE))
+        circle_overlay.set_colorkey((0, 0, 0))  # Make black transparent
+        pygame.draw.circle(
+            circle_overlay,
+            (brighten, brighten, brighten),  # Pure white, but low value for subtlety
+            (SUN_SIZE // 2, SUN_SIZE // 2),
+            110
+        )
+        frame_surface.blit(circle_overlay, (x_offset, y_offset), special_flags=pygame.BLEND_RGB_ADD)
+
     # Blit the combined frame to the screen
     screen.blit(frame_surface, (0, 0))
 
@@ -214,6 +254,10 @@ while running:
         font2 = pygame.font.SysFont(None, 40)
         text2 = font2.render("Earth's orbit destabilized!", True, (255, 255, 255))
         screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 40))
+
+    font = pygame.font.SysFont(None, 40)
+    year_text = font.render(f"{displayed_year}", True, (255, 255, 255))
+    screen.blit(year_text, (30, 30))
 
     pygame.display.flip()
     if not game_over:
