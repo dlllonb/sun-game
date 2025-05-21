@@ -83,10 +83,10 @@ EARTH_ORBIT_SPEED = 0.01  # base speed, can be affected by instability
 # Stability thresholds
 ROTATION_MIN = 0
 ROTATION_MAX = 2.5
-DRIFT_MAX = 80
+DRIFT_MAX = 45
 
 instability_counter = 0
-INSTABILITY_LIMIT = 240
+INSTABILITY_LIMIT = 210
 game_over = False
 
 years = 0.0
