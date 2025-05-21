@@ -14,10 +14,10 @@ args = parser.parse_args()
 
 if args.rotation is None:
     # Mac, something like:
-    port = '/dev/tty.ESP32Sun'
+    # port = '/dev/tty.ESP32Sun'
     # PC 
     # may not be COM6 depending on your system, must pair to device first
-    # port = 'COM6'
+    port = 'COM6'
     try:
         bt = serial.Serial(port=port, baudrate=115200, timeout=1)
         time.sleep(1)  # Let the connection settle
@@ -82,11 +82,11 @@ EARTH_ORBIT_SPEED = 0.01  # base speed, can be affected by instability
 
 # Stability thresholds
 ROTATION_MIN = 0
-ROTATION_MAX = 2
-DRIFT_MAX = 40
+ROTATION_MAX = 2.5
+DRIFT_MAX = 80
 
 instability_counter = 0
-INSTABILITY_LIMIT = 180  # frames (3 seconds at 60 FPS)
+INSTABILITY_LIMIT = 240
 game_over = False
 
 years = 0.0
@@ -150,7 +150,7 @@ while running:
             pass  # rotation_speed is already set, no drift
         else:
             sensor_data = read_arduino_sensor_data(bt, 3)
-            sensor_rotation = sensor_data[2] / 2000
+            sensor_rotation = sensor_data[2] / 2500
             sensor_drift_x = sensor_data[0] / 2000
             sensor_drift_y = sensor_data[1] / 2000
 
@@ -200,8 +200,6 @@ while running:
         if earth_angle < 0:
             earth_angle += 2 * math.pi
 
-    
-
     # --- Drawing ---
     screen.fill((0, 0, 0))
 
@@ -240,10 +238,9 @@ while running:
     frame_surface.blit(base_img, (x_offset, y_offset))
     frame_surface.blit(next_img, (x_offset, y_offset))
 
-    # --- SUN BRIGHTNESS CIRCLE OVERLAY ---
-    # Normalize rotation speed to [0, 1]
-    brightness = (rotation_speed - ROTATION_MIN) / (ROTATION_MAX - ROTATION_MIN)
-    brightness = max(0, min(1, brightness))  # Clamp between 0 and 1
+    # brightness = rotation_speed + instability between 0 and 1
+    brightness = ((rotation_speed - ROTATION_MIN) / (ROTATION_MAX - ROTATION_MIN)) / 2  + \
+                    ((instability_counter / INSTABILITY_LIMIT) / 2)
 
     # Set the maximum brighten value (e.g., 40 for subtle effect)
     max_brighten = 40
