@@ -282,8 +282,13 @@ while running:
     screen.blit(year_text, (30, 30))
 
     pygame.display.flip()
+    bt.reset_input_buffer()
+    bt.reset_output_buffer()
+
     if not game_over:
         frame_index += rotation_speed
     clock.tick(FPS)
+
+
 
 pygame.quit()
