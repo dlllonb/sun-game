@@ -7,6 +7,30 @@ from collections import deque
 import math
 import argparse
 
+# Game States
+STATE_TITLE = 0
+STATE_SUN_RISING = 1
+STATE_EARTH_INTRO = 3
+STATE_GAME_PLAY = 4
+STATE_GAME_OVER = 5
+
+# Animation timing constants (in milliseconds)
+RISING_TEXT_DURATION = 12000  # Time for text to rise
+RISING_SUN_DURATION = 8000   # Time for sun to rise and reach full spin
+FINAL_RISING_PAUSE = 2000    # Brief pause at full spin before Earth intro
+
+# Target spin speed for stable spinning
+TARGET_SPIN_SPEED = 0.8
+
+ZOOM_IN_DURATION = 2000     # Time to zoom into side position
+EARTH_FADE_DURATION = 2000   # Time for Earth to fade in
+EARTH_MOVE_DURATION = 3000   # Time for Earth to start moving
+ZOOM_OUT_DURATION = 3000     # Time to zoom out to full view
+
+EARTH_APPEAR_DURATION = 2000  # Time for Earth to fade in
+EARTH_ZOOM_DURATION = 4000    # Time for Earth to zoom to position
+EARTH_ORBIT_START_DURATION = 3000  # Time to start orbital motion
+
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Sun Simulation Game")
 parser.add_argument('--rotation', type=float, default=None, help='Constant sun spin rate (disables Arduino)')
@@ -63,7 +87,7 @@ if args.rotation is not None:
     rotation_speed = args.rotation
     rotation_speed_history = deque([rotation_speed])
 else:
-    rotation_speed = 0.1 # no lower than .2
+    rotation_speed = 0.2
     rotation_speed_history = deque([rotation_speed])
 
 x_drift = 0
@@ -87,12 +111,42 @@ DRIFT_MAX = 45
 
 instability_counter = 0
 INSTABILITY_LIMIT = 210
-game_over = False
+# game_over = False # Replaced by game_state
+current_game_state = STATE_TITLE # Initial game state
 
 years = 0.0
 displayed_year = 0
 prev_earth_angle = earth_angle
 YEARS_PER_ORBIT = 100
+
+# After pygame.init() and before the main loop
+rising_start_time = 0  # Will be set when STATE_SUN_RISING begins
+rising_phase = 0       # 0: text rising, 1: pause, 2: sun rising, 3: complete
+
+spinning_start_time = 0
+spinning_phase = 0  # 0: accelerating, 1: stable spinning, 2: showing prompt
+
+earth_intro_start_time = 0
+earth_intro_phase = 0  # 0: zooming in, 1: earth appearing, 2: earth moving, 3: zooming out
+
+def reset_rising_animation():
+    global rising_start_time, rising_phase
+    rising_start_time = pygame.time.get_ticks()
+    rising_phase = 0
+
+def reset_spinning_animation():
+    global spinning_start_time, spinning_phase, frame_index
+    spinning_start_time = pygame.time.get_ticks()
+    spinning_phase = 0
+    frame_index = 0  # Reset sun animation frame
+
+def reset_earth_intro_animation():
+    global earth_intro_start_time, earth_intro_phase
+    earth_intro_start_time = pygame.time.get_ticks()
+    earth_intro_phase = 0
+
+# Initialize rising animation when game starts
+reset_rising_animation()
 
 def read_arduino_sensor_data(bt, num_parts):
     if bt and bt.in_waiting > 0:
@@ -119,19 +173,33 @@ def get_earth_pos(angle, tilt_deg=orbit_tilt_degree, distance=orbit_distance):
     return (ORBIT_CENTER[0] + x_tilt, ORBIT_CENTER[1] + y_tilt + distance)
 
 while running:
-    for event in pygame.event.get():
+    events = pygame.event.get() # Get events once per frame
+    current_time = pygame.time.get_ticks()
+    
+    for event in events:
         if event.type == pygame.QUIT:
             running = False
-        # --- Restart logic ---
-        if event.type == pygame.KEYDOWN and game_over:
-            if event.key == pygame.K_r:
+        
+        # Handle state-specific KEYDOWN events for transitions or actions
+        if current_game_state == STATE_TITLE:
+            if event.type == pygame.KEYDOWN:
+                current_game_state = STATE_SUN_RISING
+                reset_rising_animation()  # Start animation timing
+        elif current_game_state == STATE_SUN_RISING:
+            # Animation will control state transition now
+            pass
+        elif current_game_state == STATE_EARTH_INTRO:
+            if event.type == pygame.KEYDOWN and event.key == pygame.KEYDOWN:
+                current_game_state = STATE_GAME_PLAY
+        elif current_game_state == STATE_GAME_OVER:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 # Reset all game state variables
                 frame_index = 0
                 if args.rotation is not None:
                     rotation_speed = args.rotation
                     rotation_speed_history = deque([rotation_speed])
                 else:
-                    rotation_speed = 0.1
+                    rotation_speed = 0.2
                     rotation_speed_history = deque([rotation_speed])
                 x_drift = 0
                 y_drift = 0
@@ -140,13 +208,247 @@ while running:
                 earth_angle = 0
                 prev_earth_angle = earth_angle
                 instability_counter = 0
-                game_over = False
+                current_game_state = STATE_GAME_PLAY # Restart to game play
                 years = 0.0
                 displayed_year = 0
+        # Note: STATE_GAME_PLAY might have its own event handling for other actions if needed
 
-    if not game_over:
+    screen.fill((0, 0, 0)) # Clear screen once at the beginning of the loop
+
+    if current_game_state == STATE_TITLE:
+        # Only show title screen elements, no game objects
+        screen.fill((0, 0, 0))  # Clear screen with black
+        font = pygame.font.SysFont(None, 74)
+        title_text = font.render("Sun Game", True, (255, 255, 255))
+        screen.blit(title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, SCREEN_HEIGHT // 2 - 100))
+        font_small = pygame.font.SysFont(None, 36)
+        prompt_text = font_small.render("Press any key to start", True, (200, 200, 200))
+        screen.blit(prompt_text, (SCREEN_WIDTH // 2 - prompt_text.get_width() // 2, SCREEN_HEIGHT // 2))
+        pygame.display.flip()  # Update the display
+        continue  # Skip the rest of the loop to avoid drawing game objects
+
+    elif current_game_state == STATE_SUN_RISING:
+        elapsed = current_time - rising_start_time
+        
+        if rising_phase == 0:  # Text rising phase
+            if elapsed < RISING_TEXT_DURATION:
+                # Calculate text position (move from bottom to top)
+                progress = elapsed / RISING_TEXT_DURATION
+                
+                font = pygame.font.SysFont(None, 50)
+                texts = [
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                    "Placeholder text for explanation of game",
+                ]
+                
+                # Calculate total height needed for all text
+                LINE_SPACING = 60
+                total_text_height = len(texts) * LINE_SPACING
+                # Add extra padding to ensure all text moves off screen
+                total_distance = SCREEN_HEIGHT + total_text_height + 100  # 100px extra padding
+                
+                # Calculate starting Y position that will allow all text to be visible
+                start_y = SCREEN_HEIGHT + LINE_SPACING
+                # Calculate current Y position
+                text_y = start_y - (progress * total_distance)
+                
+                # Draw each line of text with spacing
+                for i, line in enumerate(texts):
+                    text_surface = font.render(line, True, (255, 255, 255))
+                    text_rect = text_surface.get_rect(center=(SCREEN_WIDTH/2, text_y + i*LINE_SPACING))
+                    # Only draw text if it's in or near the visible area
+                    if -100 <= text_rect.bottom <= SCREEN_HEIGHT + 100:
+                        screen.blit(text_surface, text_rect)
+            else:
+                rising_phase = 1
+                rising_start_time = current_time  # Reset timer for sun rising phase
+        
+        elif rising_phase == 1:  # Combined sun rising and spinning phase
+            if elapsed < RISING_SUN_DURATION:
+                progress = elapsed / RISING_SUN_DURATION
+                
+                # Use ease-out for position
+                position_progress = 1 - (1 - progress) * (1 - progress)
+                
+                # Calculate sun position (move from below screen to center)
+                sun_y = SCREEN_HEIGHT + SUN_SIZE//2 - (position_progress * ((SCREEN_HEIGHT + SUN_SIZE//2) - SCREEN_HEIGHT//2))
+                
+                current_spin_speed = min(TARGET_SPIN_SPEED, max(TARGET_SPIN_SPEED * progress, 0.25))
+            
+                # Update frame index for spinning
+                frame_index += current_spin_speed
+                frame_base = int(frame_index) % len(sun_frames)
+                
+                # Draw the sun at its current position
+                frame_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+                x_offset = (SCREEN_WIDTH - SUN_SIZE) // 2
+                y_offset = int(sun_y - SUN_SIZE//2)
+                frame_surface.blit(sun_frames[frame_base], (x_offset, y_offset))
+                screen.blit(frame_surface, (0, 0))
+            else:
+                # Brief pause at full spin
+                if elapsed < RISING_SUN_DURATION + FINAL_RISING_PAUSE:
+                    frame_index += TARGET_SPIN_SPEED
+                    frame_base = int(frame_index) % len(sun_frames)
+                    
+                    # Draw the sun at center
+                    frame_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+                    x_offset = (SCREEN_WIDTH - SUN_SIZE) // 2
+                    y_offset = (SCREEN_HEIGHT - SUN_SIZE) // 2
+                    frame_surface.blit(sun_frames[frame_base], (x_offset, y_offset))
+                    screen.blit(frame_surface, (0, 0))
+                else:
+                    # Transition directly to Earth intro
+                    current_game_state = STATE_EARTH_INTRO
+                    reset_earth_intro_animation()
+
+    elif current_game_state == STATE_EARTH_INTRO:
+        elapsed = current_time - earth_intro_start_time
+        
+        # Start Earth at -45 degrees (closer to center) instead of 0 degrees (far right of orbit)
+        EARTH_START_ANGLE = -math.pi/4  # -45 degrees
+        ORBIT_MOVEMENT_AMOUNT = math.pi/2  # How far the Earth moves during zoom out
+        
+        # Get Earth's orbital position - this is where we want to center the zoom
+        earth_orbital_pos = get_earth_pos(EARTH_START_ANGLE)
+        FINAL_ZOOM_CENTER_X = earth_orbital_pos[0]
+        FINAL_ZOOM_CENTER_Y = earth_orbital_pos[1]
+        MAX_ZOOM = 4.0
+        
+        # Start from the sun's center position
+        START_CENTER_X = SCREEN_WIDTH / 2
+        START_CENTER_Y = SCREEN_HEIGHT / 2
+        
+        # Draw base scene with sun (always in the same position as spinning stage)
+        frame_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        x_offset = (SCREEN_WIDTH - SUN_SIZE) // 2
+        y_offset = (SCREEN_HEIGHT - SUN_SIZE) // 2
+        frame_index += TARGET_SPIN_SPEED
+        frame_base = int(frame_index) % len(sun_frames)
+        frame_surface.blit(sun_frames[frame_base], (x_offset, y_offset))
+        
+        if earth_intro_phase == 0:  # Zooming in phase
+            if elapsed < ZOOM_IN_DURATION:
+                progress = elapsed / ZOOM_IN_DURATION
+                # Use ease-in-out for smooth zoom and movement
+                ease_progress = progress * progress * (3 - 2 * progress)
+                
+                # Gradually move the view center from sun to Earth's position
+                current_center_x = START_CENTER_X + (FINAL_ZOOM_CENTER_X - START_CENTER_X) * ease_progress
+                current_center_y = START_CENTER_Y + (FINAL_ZOOM_CENTER_Y - START_CENTER_Y) * ease_progress
+                
+                # Calculate zoom scale with a slight delay to start
+                zoom_progress = max(0, (progress - 0.1) * 1.1)  # Delay zoom start by 10%
+                zoom_progress = min(1, zoom_progress)  # Clamp to 1
+                zoom_scale = 1 + ((MAX_ZOOM - 1) * (zoom_progress * zoom_progress))  # Ease-in zoom
+                
+                # Calculate view offset based on current center
+                view_offset_x = (current_center_x - SCREEN_WIDTH/2)
+                view_offset_y = (current_center_y - SCREEN_HEIGHT/2)
+            else:
+                earth_intro_phase = 1
+                earth_intro_start_time = current_time
+                zoom_scale = MAX_ZOOM
+                view_offset_x = (FINAL_ZOOM_CENTER_X - SCREEN_WIDTH/2)
+                view_offset_y = (FINAL_ZOOM_CENTER_Y - SCREEN_HEIGHT/2)
+        
+        elif earth_intro_phase == 1:  # Earth appearing phase
+            zoom_scale = MAX_ZOOM
+            if elapsed < EARTH_FADE_DURATION:
+                progress = elapsed / EARTH_FADE_DURATION
+                # Use ease-in for smooth fade
+                alpha = int(255 * (progress * progress))
+                
+                # Draw Earth with fade effect at its orbital position
+                earth_surface = pygame.Surface((64, 64), pygame.SRCALPHA)
+                pygame.draw.circle(earth_surface, (80, 120, 255, alpha), (32, 32), 32)
+                earth_rect = earth_surface.get_rect(center=earth_orbital_pos)
+                frame_surface.blit(earth_surface, earth_rect)
+                
+                view_offset_x = (FINAL_ZOOM_CENTER_X - SCREEN_WIDTH/2)
+                view_offset_y = (FINAL_ZOOM_CENTER_Y - SCREEN_HEIGHT/2)
+            else:
+                earth_intro_phase = 2
+                earth_intro_start_time = current_time
+        
+        elif earth_intro_phase == 2:  # Zooming out phase
+            if elapsed < ZOOM_OUT_DURATION:
+                progress = elapsed / ZOOM_OUT_DURATION
+                # Use ease-in-out for smooth zoom
+                ease_progress = progress * progress * (3 - 2 * progress)
+                zoom_scale = MAX_ZOOM - ((MAX_ZOOM - 1) * ease_progress)
+                
+                # Calculate Earth's current angle with eased movement
+                # Start movement slowly and then accelerate
+                movement_progress = progress * progress  # Ease-in for orbital movement
+                current_angle = EARTH_START_ANGLE - (ORBIT_MOVEMENT_AMOUNT * movement_progress)
+                current_earth_pos = get_earth_pos(current_angle)
+                
+                # Check if Earth is behind sun for proper z-ordering
+                earth_behind = current_earth_pos[1] < ORBIT_CENTER[1]
+                
+                # Draw Earth behind sun if needed
+                if earth_behind:
+                    pygame.draw.circle(frame_surface, (80, 120, 255), (int(current_earth_pos[0]), int(current_earth_pos[1])), 32)
+                
+                # Draw sun
+                frame_surface.blit(sun_frames[frame_base], (x_offset, y_offset))
+                
+                # Draw Earth in front if needed
+                if not earth_behind:
+                    pygame.draw.circle(frame_surface, (80, 120, 255), (int(current_earth_pos[0]), int(current_earth_pos[1])), 32)
+                
+                # Calculate view offset with transition back to center
+                # Follow Earth's movement partially during first half of zoom out
+                if progress < 0.5:
+                    # Gradually reduce how much we follow the Earth
+                    follow_strength = 1 - (progress * 2)  # Goes from 1 to 0 over first half
+                    current_center_x = FINAL_ZOOM_CENTER_X + (current_earth_pos[0] - earth_orbital_pos[0]) * follow_strength
+                    current_center_y = FINAL_ZOOM_CENTER_Y + (current_earth_pos[1] - earth_orbital_pos[1]) * follow_strength
+                    view_offset_x = (current_center_x - SCREEN_WIDTH/2) * (1 - ease_progress)
+                    view_offset_y = (current_center_y - SCREEN_HEIGHT/2) * (1 - ease_progress)
+                else:
+                    # Standard center transition for second half
+                    view_offset_x = (FINAL_ZOOM_CENTER_X - SCREEN_WIDTH/2) * (1 - ease_progress)
+                    view_offset_y = (FINAL_ZOOM_CENTER_Y - SCREEN_HEIGHT/2) * (1 - ease_progress)
+            else:
+                # Initialize gameplay variables with the exact final animation state
+                earth_angle = current_angle  # Start gameplay at the final animation angle
+                # Calculate initial movement speed based on the animation's final velocity
+                # This helps match the gameplay movement to the animation end state
+                EARTH_ORBIT_SPEED = (ORBIT_MOVEMENT_AMOUNT / ZOOM_OUT_DURATION) * 16.67  # Convert to per-frame speed
+                # Initialize rotation speed to match the animation
+                if args.rotation is None:
+                    rotation_speed = TARGET_SPIN_SPEED
+                    rotation_speed_history = deque([rotation_speed] * 10)  # Fill history with current speed
+                current_game_state = STATE_GAME_PLAY
+                # Don't reset frame_index here - let it continue from current value
+        
+        # Scale and position the view (consistent across all phases)
+        scaled_surface = pygame.transform.scale(
+            frame_surface,
+            (int(SCREEN_WIDTH * zoom_scale), int(SCREEN_HEIGHT * zoom_scale))
+        )
+        screen.blit(
+            scaled_surface,
+            (-view_offset_x * zoom_scale - (SCREEN_WIDTH * (zoom_scale - 1))/2,
+             -view_offset_y * zoom_scale - (SCREEN_HEIGHT * (zoom_scale - 1))/2)
+        )
+
+    elif current_game_state == STATE_GAME_PLAY:
+        # --- Existing Game Logic ---
         if args.rotation is not None:
             # Use constant rotation speed, no Arduino
+            frame_index += rotation_speed  # Make sure we're still updating frame_index
             pass  # rotation_speed is already set, no drift
         else:
             sensor_data = read_arduino_sensor_data(bt, 3)
@@ -183,7 +485,7 @@ while running:
             instability_counter = max(0, instability_counter - 1)
 
         if instability_counter > INSTABILITY_LIMIT:
-            game_over = True
+            current_game_state = STATE_GAME_OVER
 
         # --- Earth Orbit ---
         prev_earth_angle = earth_angle  # Store previous angle
@@ -200,95 +502,85 @@ while running:
         if earth_angle < 0:
             earth_angle += 2 * math.pi
 
-    # --- Drawing ---
-    screen.fill((0, 0, 0))
+        # Draw base scene
+        frame_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
 
-    # Draw orbit ellipse (for reference, optional)
-    pygame.draw.ellipse(
-        screen, (50, 50, 100), 
-        [ORBIT_CENTER[0] - ORBIT_A, ORBIT_CENTER[1] - ORBIT_B, ORBIT_A * 2, ORBIT_B * 2], 1
-    )
+        # Calculate Earth position and z-order
+        earth_pos = get_earth_pos(earth_angle, orbit_tilt_degree, orbit_distance)
+        earth_behind = earth_pos[1] < ORBIT_CENTER[1]
 
-    # Calculate Earth position
-    earth_pos = get_earth_pos(earth_angle, orbit_tilt_degree, orbit_distance)
-    # Earth is behind if its y-position is greater than the center (i.e., visually lower)
-    earth_behind = get_earth_pos(earth_angle)[1] < ORBIT_CENTER[1]
+        # Draw Earth behind sun if needed
+        if earth_behind:
+            pygame.draw.circle(frame_surface, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
 
-    # --- Sun Drawing (existing code) ---
-    frame_base = int(frame_index) % len(sun_frames)
-    frame_next = (frame_base + 1) % len(sun_frames)
-    blend_ratio = frame_index - frame_base  # value between 0 and 1
+        # Draw sun
+        x_offset = ((SCREEN_WIDTH - SUN_SIZE) // 2) + x_drift
+        y_offset = ((SCREEN_HEIGHT - SUN_SIZE) // 2) + y_drift
+        frame_base = int(frame_index) % len(sun_frames)
+        frame_next = (frame_base + 1) % len(sun_frames)
+        next_img = sun_frames[frame_next]
+        frame_surface.blit(next_img, (x_offset, y_offset))
 
-    frame_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        # Draw Earth in front if needed
+        if not earth_behind:
+            pygame.draw.circle(frame_surface, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
 
-    # Draw Earth behind sun if needed (drawn on frame_surface)
-    if earth_behind:
-        pygame.draw.circle(frame_surface, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
+        # brightness = rotation_speed + instability between 0 and 1
+        brightness = ((rotation_speed - ROTATION_MIN) / (ROTATION_MAX - ROTATION_MIN)) / 2  + \
+                        ((instability_counter / INSTABILITY_LIMIT) / 2)
 
-    x_offset = ((SCREEN_WIDTH - SUN_SIZE) // 2) + x_drift
-    y_offset = ((SCREEN_HEIGHT - SUN_SIZE) // 2) + y_drift
-    alpha_next = int(blend_ratio * 255)
-    alpha_base = 255 - alpha_next 
+        # Set the maximum brighten value 
+        max_brighten = 60
+        brighten = int(brightness * max_brighten)
 
-    # Make copies before setting alpha
-    base_img = sun_frames[frame_base].copy()
-    next_img = sun_frames[frame_next].copy()
-    base_img.set_alpha(alpha_base)
-    next_img.set_alpha(alpha_next)
-    frame_surface.blit(base_img, (x_offset, y_offset))
-    frame_surface.blit(next_img, (x_offset, y_offset))
+        if brighten > 0:
+            circle_overlay = pygame.Surface((SUN_SIZE, SUN_SIZE))
+            circle_overlay.set_colorkey((0, 0, 0))  # Make black transparent
+            pygame.draw.circle(
+                circle_overlay,
+                (brighten, brighten, brighten),  # Pure white, but low value for subtlety
+                (SUN_SIZE // 2, SUN_SIZE // 2),
+                110
+            )
+            frame_surface.blit(circle_overlay, (x_offset, y_offset), special_flags=pygame.BLEND_RGB_ADD)
 
-    # brightness = rotation_speed + instability between 0 and 1
-    brightness = ((rotation_speed - ROTATION_MIN) / (ROTATION_MAX - ROTATION_MIN)) / 2  + \
-                    ((instability_counter / INSTABILITY_LIMIT) / 2)
+        # Blit the combined frame to the screen
+        screen.blit(frame_surface, (0, 0))
 
-    # Set the maximum brighten value (e.g., 40 for subtle effect)
-    max_brighten = 40
-    brighten = int(brightness * max_brighten)
+        # Draw Earth in front if needed (drawn on screen)
+        if not earth_behind:
+            pygame.draw.circle(screen, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
 
-    if brighten > 0:
-        circle_overlay = pygame.Surface((SUN_SIZE, SUN_SIZE))
-        circle_overlay.set_colorkey((0, 0, 0))  # Make black transparent
-        pygame.draw.circle(
-            circle_overlay,
-            (brighten, brighten, brighten),  # Pure white, but low value for subtlety
-            (SUN_SIZE // 2, SUN_SIZE // 2),
-            110
-        )
-        frame_surface.blit(circle_overlay, (x_offset, y_offset), special_flags=pygame.BLEND_RGB_ADD)
+        font_ingame = pygame.font.SysFont(None, 40) # Renamed to avoid conflict
+        year_text = font_ingame.render(f"{displayed_year}", True, (255, 255, 255))
+        screen.blit(year_text, (30, 30))
 
-    # Blit the combined frame to the screen
-    screen.blit(frame_surface, (0, 0))
+        if args.rotation is None: # This check needs to be inside GAME_PLAY state
+            bt.reset_input_buffer()
+            bt.reset_output_buffer()
 
-    # Draw Earth in front if needed (drawn on screen)
-    if not earth_behind:
-        pygame.draw.circle(screen, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
+        # if not game_over: # This check is implicitly handled by current_game_state == STATE_GAME_PLAY
+        frame_index += rotation_speed
 
+
+    elif current_game_state == STATE_GAME_OVER:
     # --- Game Over Message ---
-    if game_over:
         font = pygame.font.SysFont(None, 80)
         text = font.render("GAME OVER", True, (255, 0, 0))
         screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
         font2 = pygame.font.SysFont(None, 40)
         text2 = font2.render("Earth's orbit destabilized!", True, (255, 255, 255))
         screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 40))
-        # --- Restart message ---
         font3 = pygame.font.SysFont(None, 36)
         restart_text = font3.render("Press R to Restart", True, (255, 255, 0))
         screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 100))
 
-    font = pygame.font.SysFont(None, 40)
-    year_text = font.render(f"{displayed_year}", True, (255, 255, 255))
-    screen.blit(year_text, (30, 30))
+        # Display years survived on game over screen as well
+        font_gameover = pygame.font.SysFont(None, 40)
+        year_text_gameover = font_gameover.render(f"Years Survived: {displayed_year}", True, (255, 255, 255))
+        screen.blit(year_text_gameover, (SCREEN_WIDTH // 2 - year_text_gameover.get_width() // 2, SCREEN_HEIGHT // 2 + 150))
 
     pygame.display.flip()
-    bt.reset_input_buffer()
-    bt.reset_output_buffer()
-
-    if not game_over:
-        frame_index += rotation_speed
     clock.tick(FPS)
-
-
 
 pygame.quit()
