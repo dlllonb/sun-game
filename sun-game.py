@@ -38,10 +38,10 @@ args = parser.parse_args()
 
 if args.rotation is None:
     # Mac, something like:
-    # port = '/dev/tty.ESP32Sun'
+    port = '/dev/tty.ESP32Sun'
     # PC 
     # may not be COM6 depending on your system, must pair to device first
-    port = 'COM6'
+    # port = 'COM6'
     try:
         bt = serial.Serial(port=port, baudrate=115200, timeout=1)
         time.sleep(1)  # Let the connection settle
@@ -275,7 +275,7 @@ while running:
         elif rising_phase == 1:  # Combined sun rising and spinning phase
             if elapsed < RISING_SUN_DURATION:
                 progress = elapsed / RISING_SUN_DURATION
-                
+
                 # Use ease-out for position
                 position_progress = 1 - (1 - progress) * (1 - progress)
                 
