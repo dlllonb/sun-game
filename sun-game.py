@@ -28,7 +28,7 @@ class GameState:
         self.explosion = None
 
 # Animation timing constants (in milliseconds)
-RISING_TEXT_DURATION = 12000  # Time for text to rise
+RISING_TEXT_DURATION = 16000  # Time for text to rise
 RISING_SUN_DURATION = 8000   # Time for sun to rise and reach full spin
 FINAL_RISING_PAUSE = 2000    # Brief pause at full spin before Earth intro
 
@@ -321,17 +321,29 @@ while running:
                 
                 font = pygame.font.SysFont(None, 50)
                 texts = [
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
-                    "Placeholder text for explanation of game",
+                    "Since ancient times, cultures around the world have had Sun gods.",
+                    "Apollo. Ra. Sol Invictus. Helios.",
+                    "And now you. ",
+                    "",
+                    "",
+                    "Imagine you now hold the power of the Sun",
+                    "in the palm of your hand--because you do.",
+                    "",
+                    "",
+                    "A flick of your wrist",
+                    " and all life on Earth is gone,",
+                    "along with the rest of the solar system,",
+                    "in a single flash of sunlight.",
+                    "",
+                    "",
+                    "The power of a billions of ",
+                    "thermonuclear bombs every single second,",
+                    "and stability relies on you.",
+                    "",
+                    "",
+                    "Keep the Sun spinning and stable. ",
+                    "Or don't. ",
+                    "You're the sun god. "
                 ]
                 
                 # Calculate total height needed for all text
