@@ -260,6 +260,29 @@ while running:
                 game_state.reset_explosion()
                 years = 0.0
                 displayed_year = 0
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_x:
+                game_state.current_state == STATE_TITLE
+                # Reset all game state variables
+                frame_index = 0
+                if args.rotation is not None:
+                    rotation_speed = args.rotation
+                    rotation_speed_history = deque([rotation_speed])
+                else:
+                    rotation_speed = 0.2
+                    rotation_speed_history = deque([rotation_speed])
+                x_drift = 0
+                y_drift = 0
+                current_earth_state = 0
+                earth_state_start_time = 0
+                orbit_distance = 0
+                orbit_tilt_degree = 0
+                earth_angle = 0
+                prev_earth_angle = earth_angle
+                instability_counter = 0
+                game_state.current_state = STATE_GAME_PLAY
+                game_state.reset_explosion()
+                years = 0.0
+                displayed_year = 0
 
     screen.fill((0, 0, 0)) # Clear screen once at the beginning of the loop
 
@@ -652,7 +675,7 @@ while running:
         font = pygame.font.SysFont(None, 120)
         text = font.render("GAME OVER", True, (255, 0, 0))
         screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
-        
+
         font3 = pygame.font.SysFont(None, 36)
         restart_text = font3.render("Press R to Restart", True, (255, 255, 0))
         screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 100))
