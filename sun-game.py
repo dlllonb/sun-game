@@ -63,10 +63,10 @@ args = parser.parse_args()
 
 if args.rotation is None:
     # Mac, something like:
-    port = '/dev/tty.ESP32Sun'
+    # port = '/dev/tty.ESP32Sun'
     # PC 
     # may not be COM6 depending on your system, must pair to device first
-    # port = 'COM6'
+    port = 'COM6'
     try:
         bt = serial.Serial(port=port, baudrate=115200, timeout=1)
         time.sleep(1)  # Let the connection settle
@@ -130,9 +130,10 @@ earth_angle = 0  # initial angle
 EARTH_ORBIT_SPEED = 0.01  # base speed, can be affected by instability
 
 # Stability thresholds
-ROTATION_MIN = 0
-ROTATION_MAX = 2.5
-DRIFT_MAX = 45
+ROTATION_MIN = 0.3
+ROTATION_MAX = 1.5
+DRIFT_MAX = 20
+DRIFT_SUPER_MAX = 50
 
 instability_counter = 0
 INSTABILITY_LIMIT = 210
@@ -248,6 +249,8 @@ while running:
                     rotation_speed_history = deque([rotation_speed])
                 x_drift = 0
                 y_drift = 0
+                current_earth_state = 0
+                earth_state_start_time = 0
                 orbit_distance = 0
                 orbit_tilt_degree = 0
                 earth_angle = 0
@@ -534,7 +537,7 @@ while running:
         else:
             instability_counter = max(0, instability_counter - 1)
 
-        if instability_counter > INSTABILITY_LIMIT:
+        if instability_counter > INSTABILITY_LIMIT or abs(x_drift) > DRIFT_SUPER_MAX or abs(y_drift) > DRIFT_SUPER_MAX:
             game_state.current_state = STATE_GAME_OVER
 
         # --- Earth Orbit ---
