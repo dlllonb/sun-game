@@ -522,7 +522,7 @@ while running:
             y_drift += dy - (y_drift / 100)
 
             # Have tilt influence the orbit
-            orbit_tilt_degree = max(-45, min(45, x_drift))
+            orbit_tilt_degree = max(-45, min(45, 0.1 * x_drift))
 
         # --- Stability Check ---
         unstable = (
@@ -542,7 +542,7 @@ while running:
 
         # --- Earth Orbit ---
         prev_earth_angle = earth_angle  # Store previous angle
-        earth_angle -= EARTH_ORBIT_SPEED + (0.01 if unstable else 0)
+        earth_angle -= EARTH_ORBIT_SPEED # + (0.01 if unstable else 0)
         delta_angle = prev_earth_angle - earth_angle
         if delta_angle < 0:
             delta_angle += 2 * math.pi
@@ -606,6 +606,23 @@ while running:
         font_ingame = pygame.font.SysFont(None, 40) # Renamed to avoid conflict
         year_text = font_ingame.render(f"{displayed_year}", True, (255, 255, 255))
         screen.blit(year_text, (30, 30))
+
+        # Draw instability bar
+        bar_width = 400
+        bar_height = 20
+        bar_x = (SCREEN_WIDTH - bar_width) // 2
+        bar_y = SCREEN_HEIGHT - bar_height - 20  # 20 pixels from bottom
+        
+        # Draw bar background (empty bar)
+        pygame.draw.rect(screen, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height))
+        
+        # Draw filled portion of bar
+        fill_width = int((instability_counter / INSTABILITY_LIMIT) * bar_width)
+        if fill_width > 0:
+            pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, fill_width, bar_height))
+        
+        # Draw border around bar
+        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)
 
         if args.rotation is None: # This check needs to be inside GAME_PLAY state
             bt.reset_input_buffer()
