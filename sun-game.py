@@ -28,7 +28,7 @@ class GameState:
         self.explosion = None
 
 # Animation timing constants (in milliseconds)
-RISING_TEXT_DURATION = 16000  # Time for text to rise
+RISING_TEXT_DURATION = 18000  # Time for text to rise
 RISING_SUN_DURATION = 8000   # Time for sun to rise and reach full spin
 FINAL_RISING_PAUSE = 2000    # Brief pause at full spin before Earth intro
 
@@ -327,7 +327,7 @@ while running:
                     "",
                     "",
                     "Imagine you now hold the power of the Sun",
-                    "in the palm of your hand——because you do.",
+                    "in the palm of your hand—because you do.",
                     "",
                     "",
                     "A flick of your wrist",
