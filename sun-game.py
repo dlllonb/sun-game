@@ -649,13 +649,9 @@ while running:
             game_state.explosion.draw(screen)
         
         # Draw game over text
-        font = pygame.font.SysFont(None, 80)
+        font = pygame.font.SysFont(None, 120)
         text = font.render("GAME OVER", True, (255, 0, 0))
         screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
-        
-        font2 = pygame.font.SysFont(None, 40)
-        text2 = font2.render("Earth's orbit destabilized!", True, (255, 255, 255))
-        screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 40))
         
         font3 = pygame.font.SysFont(None, 36)
         restart_text = font3.render("Press R to Restart", True, (255, 255, 0))
