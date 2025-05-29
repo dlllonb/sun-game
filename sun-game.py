@@ -44,17 +44,6 @@ EARTH_APPEAR_DURATION = 2000  # Time for Earth to fade in
 EARTH_ZOOM_DURATION = 4000    # Time for Earth to zoom to position
 EARTH_ORBIT_START_DURATION = 3000  # Time to start orbital motion
 
-# Earth appearance states
-EARTH_STATES = {
-    0: (80, 120, 255),    # Default blue
-    1: (100, 150, 100),   # More green
-    2: (160, 160, 100),   # Yellow-ish
-    3: (200, 100, 100),   # Reddish
-    4: (150, 80, 80),     # Dark red
-}
-EARTH_STATE_DURATION = 30000  # Duration for each Earth in milliseconds (30 seconds)
-current_earth_state = 0
-earth_state_start_time = 0
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Sun Simulation Game")
@@ -89,7 +78,7 @@ time.sleep(1)
 IMAGE_FOLDER = "sun-frames-background-removed"
 SUN_SIZE = 275
 try:
-        # Get a sorted list of filenames first
+    # Get a sorted list of filenames first
     image_files = sorted([
         f for f in os.listdir(IMAGE_FOLDER)
         if f.endswith('.png')
@@ -99,10 +88,31 @@ try:
     sun_frames = [pygame.image.load(os.path.join(IMAGE_FOLDER, f)) for f in image_files]
     sun_frames = [pygame.transform.smoothscale(img, (SUN_SIZE, SUN_SIZE)) for img in sun_frames]
     print(f"Loaded in {len(sun_frames)} sun frames")
+
+    # Load Earth image
+    EARTH_DISPLAY_SIZE = 64  # Size for display
+    EARTH_LOAD_SIZE = 512    # Size to load at (higher resolution)
+    earth_img = pygame.image.load('earth_default.png')
+    # First scale to high resolution
+    earth_img = pygame.transform.smoothscale(earth_img, (EARTH_LOAD_SIZE, EARTH_LOAD_SIZE))
+    # Then create display version
+    earth_display_img = pygame.transform.smoothscale(earth_img, (EARTH_DISPLAY_SIZE, EARTH_DISPLAY_SIZE))
+    print("Loaded Earth image")
 except Exception as e:
     traceback.print_exc()
     input("Failed to load images...")
 
+# Earth appearance states
+EARTH_STATES = {
+    0: earth_display_img,    # Default blue
+    1: earth_display_img,   # More green
+    2: earth_display_img,   # Yellow-ish
+    3: earth_display_img,   # Reddish
+    4: earth_display_img,     # Dark red
+}
+EARTH_STATE_DURATION = 30000  # Duration for each Earth in milliseconds (30 seconds)
+current_earth_state = 0
+earth_state_start_time = 0
 
 FPS = 60
 
@@ -442,13 +452,20 @@ while running:
                 # Use ease-in for smooth fade
                 alpha = int(255 * (progress * progress))
                 
-                # Draw Earth with fade effect at its orbital position
-                earth_surface = pygame.Surface((64, 64), pygame.SRCALPHA)
-                earth_color = get_earth_appearance(current_time)
-                earth_color_with_alpha = (*earth_color[:3], alpha)  # Add alpha to RGB color
-                pygame.draw.circle(earth_surface, earth_color_with_alpha, (32, 32), 32)
-                earth_rect = earth_surface.get_rect(center=earth_orbital_pos)
-                frame_surface.blit(earth_surface, earth_rect)
+                # Calculate size based on zoom
+                zoomed_size = int(EARTH_DISPLAY_SIZE * zoom_scale)
+                
+                # Draw Earth with fade effect at its orbital position using high-res version
+                earth_surface = pygame.Surface((EARTH_LOAD_SIZE, EARTH_LOAD_SIZE), pygame.SRCALPHA)
+                # Create a copy of the high-res earth image and set its alpha
+                temp_earth = earth_img.copy()
+                temp_earth.set_alpha(alpha)
+                earth_surface.blit(temp_earth, (0, 0))
+                
+                # Scale from high-res to zoomed size (maintaining quality)
+                scaled_earth = pygame.transform.smoothscale(earth_surface, (zoomed_size, zoomed_size))
+                earth_rect = scaled_earth.get_rect(center=earth_orbital_pos)
+                frame_surface.blit(scaled_earth, earth_rect)
                 
                 view_offset_x = (FINAL_ZOOM_CENTER_X - SCREEN_WIDTH/2)
                 view_offset_y = (FINAL_ZOOM_CENTER_Y - SCREEN_HEIGHT/2)
@@ -468,20 +485,28 @@ while running:
                 movement_progress = progress * progress  # Ease-in for orbital movement
                 current_angle = EARTH_START_ANGLE - (ORBIT_MOVEMENT_AMOUNT * movement_progress)
                 current_earth_pos = get_earth_pos(current_angle)
+
+                zoomed_size = int(EARTH_DISPLAY_SIZE * zoom_scale)
+                # Create scaled earth from high-res version
+                scaled_earth = pygame.transform.smoothscale(earth_img, (zoomed_size, zoomed_size))
                 
                 # Check if Earth is behind sun for proper z-ordering
                 earth_behind = current_earth_pos[1] < ORBIT_CENTER[1]
                 
                 # Draw Earth behind sun if needed
                 if earth_behind:
-                    pygame.draw.circle(frame_surface, (80, 120, 255), (int(current_earth_pos[0]), int(current_earth_pos[1])), 32)
+                    earth_rect = scaled_earth.get_rect()
+                    earth_rect.center = (int(current_earth_pos[0]), int(current_earth_pos[1]))
+                    frame_surface.blit(scaled_earth, earth_rect)
                 
                 # Draw sun
                 frame_surface.blit(sun_frames[frame_base], (x_offset, y_offset))
                 
                 # Draw Earth in front if needed
                 if not earth_behind:
-                    pygame.draw.circle(frame_surface, (80, 120, 255), (int(current_earth_pos[0]), int(current_earth_pos[1])), 32)
+                    earth_rect = scaled_earth.get_rect()
+                    earth_rect.center = (int(current_earth_pos[0]), int(current_earth_pos[1]))
+                    screen.blit(scaled_earth, earth_rect)
                 
                 # Calculate view offset with transition back to center
                 # Follow Earth's movement partially during first half of zoom out
@@ -586,11 +611,13 @@ while running:
         earth_behind = earth_pos[1] < ORBIT_CENTER[1]
 
         # Get current Earth appearance
-        earth_color = get_earth_appearance(current_time)
+        # earth_color = get_earth_appearance(current_time)
 
         # Draw Earth behind sun if needed
         if earth_behind:
-            pygame.draw.circle(frame_surface, earth_color, (int(earth_pos[0]), int(earth_pos[1])), 32)
+            earth_rect = earth_display_img.get_rect()
+            earth_rect.center = (int(earth_pos[0]), int(earth_pos[1]))
+            frame_surface.blit(earth_display_img, earth_rect)
 
         # Draw sun
         x_offset = ((SCREEN_WIDTH - SUN_SIZE) // 2) + x_drift
@@ -624,7 +651,9 @@ while running:
 
         # Draw Earth in front if needed (drawn on screen)
         if not earth_behind:
-            pygame.draw.circle(screen, earth_color, (int(earth_pos[0]), int(earth_pos[1])), 32)
+            earth_rect = earth_display_img.get_rect()
+            earth_rect.center = (int(earth_pos[0]), int(earth_pos[1]))
+            screen.blit(earth_display_img, earth_rect)
 
         font_ingame = pygame.font.SysFont(None, 40) # Renamed to avoid conflict
         year_text = font_ingame.render(f"{displayed_year}", True, (255, 255, 255))
