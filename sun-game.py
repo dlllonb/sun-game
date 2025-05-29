@@ -6,6 +6,8 @@ import traceback
 from collections import deque
 import math
 import argparse
+import random
+from explosion import ExplosionSystem
 
 # Game States
 STATE_TITLE = 0
@@ -13,6 +15,17 @@ STATE_SUN_RISING = 1
 STATE_EARTH_INTRO = 3
 STATE_GAME_PLAY = 4
 STATE_GAME_OVER = 5
+
+class GameState:
+    def __init__(self):
+        self.current_state = STATE_TITLE
+        self.explosion = None
+        
+    def start_explosion(self, x, y, sun_frame):
+        self.explosion = ExplosionSystem(x, y, sun_frame)
+        
+    def reset_explosion(self):
+        self.explosion = None
 
 # Animation timing constants (in milliseconds)
 RISING_TEXT_DURATION = 12000  # Time for text to rise
@@ -30,6 +43,18 @@ ZOOM_OUT_DURATION = 3000     # Time to zoom out to full view
 EARTH_APPEAR_DURATION = 2000  # Time for Earth to fade in
 EARTH_ZOOM_DURATION = 4000    # Time for Earth to zoom to position
 EARTH_ORBIT_START_DURATION = 3000  # Time to start orbital motion
+
+# Earth appearance states
+EARTH_STATES = {
+    0: (80, 120, 255),    # Default blue
+    1: (100, 150, 100),   # More green
+    2: (160, 160, 100),   # Yellow-ish
+    3: (200, 100, 100),   # Reddish
+    4: (150, 80, 80),     # Dark red
+}
+EARTH_STATE_DURATION = 30000  # Duration for each Earth in milliseconds (30 seconds)
+current_earth_state = 0
+earth_state_start_time = 0
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Sun Simulation Game")
@@ -145,6 +170,22 @@ def reset_earth_intro_animation():
     earth_intro_start_time = pygame.time.get_ticks()
     earth_intro_phase = 0
 
+def get_earth_appearance(current_time):
+    global current_earth_state, earth_state_start_time
+    
+    # Initialize start time if not set
+    if earth_state_start_time == 0:
+        earth_state_start_time = current_time
+    
+    # Check if it's time to change state
+    elapsed = current_time - earth_state_start_time
+    if elapsed >= EARTH_STATE_DURATION:
+        # Move to next state
+        current_earth_state = (current_earth_state + 1) % len(EARTH_STATES)
+        earth_state_start_time = current_time
+    
+    return EARTH_STATES[current_earth_state]
+
 # Initialize rising animation when game starts
 reset_rising_animation()
 
@@ -172,6 +213,10 @@ def get_earth_pos(angle, tilt_deg=orbit_tilt_degree, distance=orbit_distance):
     # Apply distance (vertical offset)
     return (ORBIT_CENTER[0] + x_tilt, ORBIT_CENTER[1] + y_tilt + distance)
 
+# Initialize game state
+game_state = GameState()
+current_game_state = STATE_TITLE  # For compatibility with existing code
+
 while running:
     events = pygame.event.get() # Get events once per frame
     current_time = pygame.time.get_ticks()
@@ -181,17 +226,17 @@ while running:
             running = False
         
         # Handle state-specific KEYDOWN events for transitions or actions
-        if current_game_state == STATE_TITLE:
+        if game_state.current_state == STATE_TITLE:
             if event.type == pygame.KEYDOWN:
-                current_game_state = STATE_SUN_RISING
+                game_state.current_state = STATE_SUN_RISING
                 reset_rising_animation()  # Start animation timing
-        elif current_game_state == STATE_SUN_RISING:
+        elif game_state.current_state == STATE_SUN_RISING:
             # Animation will control state transition now
             pass
-        elif current_game_state == STATE_EARTH_INTRO:
+        elif game_state.current_state == STATE_EARTH_INTRO:
             if event.type == pygame.KEYDOWN and event.key == pygame.KEYDOWN:
-                current_game_state = STATE_GAME_PLAY
-        elif current_game_state == STATE_GAME_OVER:
+                game_state.current_state = STATE_GAME_PLAY
+        elif game_state.current_state == STATE_GAME_OVER:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 # Reset all game state variables
                 frame_index = 0
@@ -208,18 +253,18 @@ while running:
                 earth_angle = 0
                 prev_earth_angle = earth_angle
                 instability_counter = 0
-                current_game_state = STATE_GAME_PLAY # Restart to game play
+                game_state.current_state = STATE_GAME_PLAY
+                game_state.reset_explosion()
                 years = 0.0
                 displayed_year = 0
-        # Note: STATE_GAME_PLAY might have its own event handling for other actions if needed
 
     screen.fill((0, 0, 0)) # Clear screen once at the beginning of the loop
 
-    if current_game_state == STATE_TITLE:
+    if game_state.current_state == STATE_TITLE:
         # Only show title screen elements, no game objects
         screen.fill((0, 0, 0))  # Clear screen with black
-        font = pygame.font.SysFont(None, 74)
-        title_text = font.render("Sun Game", True, (255, 255, 255))
+        font = pygame.font.SysFont(None, 100)
+        title_text = font.render("HELIOS", True, (255, 255, 255))
         screen.blit(title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, SCREEN_HEIGHT // 2 - 100))
         font_small = pygame.font.SysFont(None, 36)
         prompt_text = font_small.render("Press any key to start", True, (200, 200, 200))
@@ -227,7 +272,10 @@ while running:
         pygame.display.flip()  # Update the display
         continue  # Skip the rest of the loop to avoid drawing game objects
 
-    elif current_game_state == STATE_SUN_RISING:
+    # Update current_game_state for compatibility with existing code
+    current_game_state = game_state.current_state
+
+    if game_state.current_state == STATE_SUN_RISING:
         elapsed = current_time - rising_start_time
         
         if rising_phase == 0:  # Text rising phase
@@ -308,10 +356,10 @@ while running:
                     screen.blit(frame_surface, (0, 0))
                 else:
                     # Transition directly to Earth intro
-                    current_game_state = STATE_EARTH_INTRO
+                    game_state.current_state = STATE_EARTH_INTRO
                     reset_earth_intro_animation()
 
-    elif current_game_state == STATE_EARTH_INTRO:
+    elif game_state.current_state == STATE_EARTH_INTRO:
         elapsed = current_time - earth_intro_start_time
         
         # Start Earth at -45 degrees (closer to center) instead of 0 degrees (far right of orbit)
@@ -370,7 +418,9 @@ while running:
                 
                 # Draw Earth with fade effect at its orbital position
                 earth_surface = pygame.Surface((64, 64), pygame.SRCALPHA)
-                pygame.draw.circle(earth_surface, (80, 120, 255, alpha), (32, 32), 32)
+                earth_color = get_earth_appearance(current_time)
+                earth_color_with_alpha = (*earth_color[:3], alpha)  # Add alpha to RGB color
+                pygame.draw.circle(earth_surface, earth_color_with_alpha, (32, 32), 32)
                 earth_rect = earth_surface.get_rect(center=earth_orbital_pos)
                 frame_surface.blit(earth_surface, earth_rect)
                 
@@ -430,7 +480,7 @@ while running:
                 if args.rotation is None:
                     rotation_speed = TARGET_SPIN_SPEED
                     rotation_speed_history = deque([rotation_speed] * 10)  # Fill history with current speed
-                current_game_state = STATE_GAME_PLAY
+                game_state.current_state = STATE_GAME_PLAY
                 # Don't reset frame_index here - let it continue from current value
         
         # Scale and position the view (consistent across all phases)
@@ -444,7 +494,7 @@ while running:
              -view_offset_y * zoom_scale - (SCREEN_HEIGHT * (zoom_scale - 1))/2)
         )
 
-    elif current_game_state == STATE_GAME_PLAY:
+    elif game_state.current_state == STATE_GAME_PLAY:
         # --- Existing Game Logic ---
         if args.rotation is not None:
             # Use constant rotation speed, no Arduino
@@ -485,7 +535,7 @@ while running:
             instability_counter = max(0, instability_counter - 1)
 
         if instability_counter > INSTABILITY_LIMIT:
-            current_game_state = STATE_GAME_OVER
+            game_state.current_state = STATE_GAME_OVER
 
         # --- Earth Orbit ---
         prev_earth_angle = earth_angle  # Store previous angle
@@ -509,9 +559,12 @@ while running:
         earth_pos = get_earth_pos(earth_angle, orbit_tilt_degree, orbit_distance)
         earth_behind = earth_pos[1] < ORBIT_CENTER[1]
 
+        # Get current Earth appearance
+        earth_color = get_earth_appearance(current_time)
+
         # Draw Earth behind sun if needed
         if earth_behind:
-            pygame.draw.circle(frame_surface, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
+            pygame.draw.circle(frame_surface, earth_color, (int(earth_pos[0]), int(earth_pos[1])), 32)
 
         # Draw sun
         x_offset = ((SCREEN_WIDTH - SUN_SIZE) // 2) + x_drift
@@ -520,11 +573,7 @@ while running:
         frame_next = (frame_base + 1) % len(sun_frames)
         next_img = sun_frames[frame_next]
         frame_surface.blit(next_img, (x_offset, y_offset))
-
-        # Draw Earth in front if needed
-        if not earth_behind:
-            pygame.draw.circle(frame_surface, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
-
+        
         # brightness = rotation_speed + instability between 0 and 1
         brightness = ((rotation_speed - ROTATION_MIN) / (ROTATION_MAX - ROTATION_MIN)) / 2  + \
                         ((instability_counter / INSTABILITY_LIMIT) / 2)
@@ -549,7 +598,7 @@ while running:
 
         # Draw Earth in front if needed (drawn on screen)
         if not earth_behind:
-            pygame.draw.circle(screen, (80, 120, 255), (int(earth_pos[0]), int(earth_pos[1])), 32)
+            pygame.draw.circle(screen, earth_color, (int(earth_pos[0]), int(earth_pos[1])), 32)
 
         font_ingame = pygame.font.SysFont(None, 40) # Renamed to avoid conflict
         year_text = font_ingame.render(f"{displayed_year}", True, (255, 255, 255))
@@ -563,19 +612,36 @@ while running:
         frame_index += rotation_speed
 
 
-    elif current_game_state == STATE_GAME_OVER:
-    # --- Game Over Message ---
+    elif game_state.current_state == STATE_GAME_OVER:
+        # Initialize explosion if not already started
+        if game_state.explosion is None:
+            # Get current sun frame for explosion
+            frame_base = int(frame_index) % len(sun_frames)
+            current_frame = sun_frames[frame_base]
+            game_state.start_explosion(
+                SCREEN_WIDTH // 2 + x_drift, 
+                SCREEN_HEIGHT // 2 + y_drift,
+                current_frame
+            )
+        
+        # Update and draw explosion
+        if game_state.explosion and game_state.explosion.update():
+            game_state.explosion.draw(screen)
+        
+        # Draw game over text
         font = pygame.font.SysFont(None, 80)
         text = font.render("GAME OVER", True, (255, 0, 0))
         screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
+        
         font2 = pygame.font.SysFont(None, 40)
         text2 = font2.render("Earth's orbit destabilized!", True, (255, 255, 255))
         screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 40))
+        
         font3 = pygame.font.SysFont(None, 36)
         restart_text = font3.render("Press R to Restart", True, (255, 255, 0))
         screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 100))
 
-        # Display years survived on game over screen as well
+        # Display years survived
         font_gameover = pygame.font.SysFont(None, 40)
         year_text_gameover = font_gameover.render(f"Years Survived: {displayed_year}", True, (255, 255, 255))
         screen.blit(year_text_gameover, (SCREEN_WIDTH // 2 - year_text_gameover.get_width() // 2, SCREEN_HEIGHT // 2 + 150))
