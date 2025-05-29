@@ -28,7 +28,7 @@ EARTH_MESSAGES = {
     6: "Technology begins to develop, and spreads quickly across the planet",
     7: "Earth is conquered by technology"
 }
-MESSAGE_DISPLAY_DURATION = 2500  # 2 seconds in milliseconds
+MESSAGE_DISPLAY_DURATION = 3500  # 2 seconds in milliseconds
 
 class GameState:
     def __init__(self):
