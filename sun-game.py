@@ -136,7 +136,7 @@ DRIFT_MAX = 20
 DRIFT_SUPER_MAX = 50
 
 instability_counter = 0
-INSTABILITY_LIMIT = 210
+INSTABILITY_LIMIT = 100
 # game_over = False # Replaced by game_state
 current_game_state = STATE_TITLE # Initial game state
 
